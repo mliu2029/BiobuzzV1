@@ -1,48 +1,52 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.ivy.Command;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.Gamepad;
-import com.qualcomm.robotcore.hardware.HardwareMap;
-
+import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
+import java.util.function.DoubleSupplier;
 
 public class Transfer implements Mechanism {
-    private DcMotorEx transfer;
-    private DcMotorEx leftTransfer;
+    private final NextMotor transfer = new NextMotor("transfer");
+    private final NextMotor leftTransfer = new NextMotor("transfer2");
 
-    private Gamepad driver;
-
-    public void initialize(HardwareMap hardwareMap, Gamepad driver) {
-        this.driver = driver;
-        transfer = hardwareMap.get(DcMotorEx.class, "transfer");
-        leftTransfer=hardwareMap.get(DcMotorEx.class,"transfer2");
-        transfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        leftTransfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        stop();
+    public Transfer() {
+        transfer.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
+        leftTransfer.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
     }
 
-    @Override
-    public Command getDefaultCommand() {
-        return infinite(() -> {
-            if (driver.left_bumper) {
-                setPower(-1);
-            } else if (driver.right_bumper) {
-                setPower(1);
-            } else {
-                stop();
-            }
-        });
+    public Command on() {
+        return setPower(1.0);
     }
 
-    private void setPower(double power) {
-       transfer.setPower(power);
-       leftTransfer.setPower(power);
+    public Command reverse() {
+        return setPower(-1.0);
     }
 
-    public void stop() {
-        setPower(0);
+    public Command setPower(double power) {
+        return instant(() -> applyPower(power));
+    }
+
+    public Command run() {
+        return run(() -> 0.8);
+    }
+
+    public Command run(DoubleSupplier power) {
+        return infinite(() -> applyPower(power.getAsDouble()))
+                .setEnd(condition -> applyPower(0.0));
+    }
+
+    public Command stop() {
+        return setPower(0.0);
+    }
+
+    private void applyPower(double power) {
+        transfer.setThrottle(power);
+        leftTransfer.setThrottle(power);
+    }
+
+    public void stopImmediately() {
+        applyPower(0.0);
+        transfer.update();
+        leftTransfer.update();
     }
 }

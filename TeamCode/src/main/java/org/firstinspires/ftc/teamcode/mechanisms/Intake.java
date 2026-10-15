@@ -1,40 +1,35 @@
-
-
 package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.ivy.Command;
-import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.Gamepad;
-import com.qualcomm.robotcore.hardware.HardwareMap;
+import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 
 public class Intake implements Mechanism {
-    private DcMotor motor;
-    private Gamepad driver;
-    private double power;
+    private final NextMotor motor = new NextMotor("intake");
 
-    public void initialize(HardwareMap hardwareMap, Gamepad driver) {
-        this.driver = driver;
-        motor = hardwareMap.get(DcMotor.class, "intake");
-        motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        stop();
+    public Intake() {
+        motor.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
     }
 
-    @Override
-    public Command getDefaultCommand() {
-        return infinite(() -> {
-            if (driver.circle) power = 1;
-            if (driver.square) power = -1;
-            applyPower();
-        });
+    /** Starts the intake; it keeps running until another power command is scheduled. */
+    public Command run() {
+        return setPower(1.0);
     }
 
-    private void applyPower() {
-        motor.setPower(power);
+    public Command reverse() {
+        return setPower(-1.0);
     }
 
-    public void stop() {
-        power = 0;
-        applyPower();
+    public Command setPower(double power) {
+        return instant(() -> motor.setThrottle(power));
+    }
+
+    public Command stop() {
+        return setPower(0.0);
+    }
+
+    public void stopImmediately() {
+        motor.setThrottle(0.0);
+        motor.update();
     }
 }

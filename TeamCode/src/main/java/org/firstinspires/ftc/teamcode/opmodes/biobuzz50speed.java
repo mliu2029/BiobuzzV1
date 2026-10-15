@@ -20,13 +20,15 @@
  *   SOFTWARE.
  */
 
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.opmodes;
 
 import dev.nextftc.robot.opmode.NextTeleop;
+import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.StarterBotTeleop;
 
-@NextTeleop(name = "BioBuzz 30% Teleop", group = "StarterBot")
-public class    BioBuzzStarterbotTeleopMecanum30 extends StarterBotTeleop {
-    public BioBuzzStarterbotTeleopMecanum30(Robot robot) {
-        super(robot, 0.3, 50);
+@NextTeleop(name = "BioBuzz 50% Speed TeleOp", group = "StarterBot")
+public class biobuzz50speed extends StarterBotTeleop {
+    public biobuzz50speed(Robot robot) {
+        super(robot, 0.5, 50);
     }
 }

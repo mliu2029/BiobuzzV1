@@ -22,8 +22,10 @@
 
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.robotcore.hardware.Gamepad;
+import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.commands.Commands;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import dev.nextftc.robot.Mechanism;
 import dev.nextftc.robot.NextRobot;
 import java.util.Arrays;
@@ -49,18 +51,27 @@ public class Robot implements NextRobot {
         return mechanisms;
     }
 
-    public void initialize(HardwareMap hardwareMap, Gamepad driver,
-                           double driveScale) {
-        drivetrain.initialize(hardwareMap, driver, driveScale);
-        intake.initialize(hardwareMap, driver);
-        shooter.initialize(hardwareMap, driver);
-        transfer.initialize(hardwareMap, driver);
+    /** Call from any NextOpMode constructor to begin with all outputs stopped. */
+    public void initialize(HardwareMap hardwareMap) {
+        initialize(hardwareMap, null);
     }
 
-    public void stop() {
-        drivetrain.stop();
-        intake.stop();
-        shooter.stop();
-        transfer.stop();
+    public void initialize(HardwareMap hardwareMap, Gamepad driver) {
+        drivetrain.initialize(hardwareMap);
+        intake.stopImmediately();
+        shooter.initialize(hardwareMap, driver);
+        transfer.stopImmediately();
+    }
+
+    /** A composable stop command that owns every mechanism. */
+    public Command stop() {
+        return Commands.instant(this::stopImmediately).requiring(mechanisms.toArray());
+    }
+
+    public void stopImmediately() {
+        drivetrain.stopImmediately();
+        intake.stopImmediately();
+        shooter.stopImmediately();
+        transfer.stopImmediately();
     }
 }

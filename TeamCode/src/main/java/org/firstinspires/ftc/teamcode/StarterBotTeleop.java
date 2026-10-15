@@ -22,26 +22,50 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import com.pedropathing.ivy.Command;
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
+import dev.nextftc.robot.triggers.CommandGamepad;
 
 public abstract class StarterBotTeleop extends NextOpMode {
     protected final Robot robot;
-    private final int velocityStep;
+    private final Command driveCommand;
 
     protected StarterBotTeleop(Robot robot, double driveScale, int velocityStep) {
-        super(robot, BulkReadHook.INSTANCE);// change this to lynx hubs asap
+        super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
-        this.velocityStep = velocityStep; //25
-        robot.initialize(hardwareMap, gamepad1, driveScale);
+        robot.initialize(hardwareMap, gamepad1);
+
+        CommandGamepad driver = new CommandGamepad(gamepad1);
+        driveCommand = robot.drivetrain.drive(
+                () -> -gamepad1.right_stick_y,
+                () -> gamepad1.right_stick_x,
+                () -> gamepad1.left_stick_x,
+                driveScale);
+
+        // Shooter's default command handles D-pad up/down.
+        driver.circle().onTrue(robot.intake.run());
+        driver.square().onTrue(robot.intake.reverse());
+        driver.dpadRight().onTrue(robot.shooter.instant(
+                () -> robot.shooter.adjustVelocity(velocityStep)));
+        driver.dpadLeft().onTrue(robot.shooter.instant(
+                () -> robot.shooter.adjustVelocity(-velocityStep)));
+
+        // One held command preserves left-bumper priority when both are pressed.
+        driver.leftBumper().or(() -> gamepad1.right_bumper)
+                .whileTrue(robot.transfer.run(() -> gamepad1.left_bumper ? -1.0 : 1.0));
+
         telemetry.addData("Status", "Initialized");
         telemetry.update();
     }
 
     @Override
+    public void start() {
+        driveCommand.schedule();
+    }
+
+    @Override
     public void periodic() {
-        if (gamepad1.dpadRightWasPressed()) robot.shooter.adjustVelocity(velocityStep);
-        if (gamepad1.dpadLeftWasPressed()) robot.shooter.adjustVelocity(-velocityStep);
         telemetry.addData("TargetVelocity", robot.shooter.getTargetVelocity());
         telemetry.addData("Shooter Velocity", robot.shooter.getVelocity());
         telemetry.update();
@@ -49,6 +73,6 @@ public abstract class StarterBotTeleop extends NextOpMode {
 
     @Override
     public void end() {
-        robot.stop();
+        robot.stopImmediately();
     }
 }

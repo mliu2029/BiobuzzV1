@@ -38,8 +38,17 @@ android {
     }
 }
 
+repositories {
+    maven {
+        url 'https://mymaven.bylazar.com/releases'
+    }
+}
+
 dependencies {
     implementation project(':FtcRobotController')
     implementation 'com.pedropathing:revhub:3.0.1'
     implementation 'com.pedropathing:tuning:1.0.1'
+    implementation 'com.pedropathing.ivy:pedro:1.1.1'
+    implementation 'com.bylazar:fullpanels:1.0.18'
+    testImplementation 'junit:junit:4.13.2'
 }
