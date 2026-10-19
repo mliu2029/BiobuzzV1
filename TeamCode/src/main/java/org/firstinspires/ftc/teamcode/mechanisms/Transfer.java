@@ -6,20 +6,23 @@ import dev.nextftc.robot.Mechanism;
 import java.util.function.DoubleSupplier;
 
 public class Transfer implements Mechanism {
-    private final NextMotor transfer = new NextMotor("transfer");
-    private final NextMotor leftTransfer = new NextMotor("transfer2");
+    private final NextMotor[] motors = {
+            new NextMotor("transfer"),
+            new NextMotor("transfer2")
+    };
 
     public Transfer() {
-        transfer.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
-        leftTransfer.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
+        for (NextMotor motor : motors) {
+            motor.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
+        }
     }
 
     public Command on() {
-        return setPower(1.0);
+        return setPower(0.6);
     }
 
     public Command reverse() {
-        return setPower(-1.0);
+        return setPower(-0.6);
     }
 
     public Command setPower(double power) {
@@ -40,13 +43,15 @@ public class Transfer implements Mechanism {
     }
 
     private void applyPower(double power) {
-        transfer.setThrottle(power);
-        leftTransfer.setThrottle(power);
+        for (NextMotor motor : motors) {
+            motor.setThrottle(power);
+        }
     }
 
     public void stopImmediately() {
         applyPower(0.0);
-        transfer.update();
-        leftTransfer.update();
+        for (NextMotor motor : motors) {
+            motor.update();
+        }
     }
 }

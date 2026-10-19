@@ -49,22 +49,22 @@ Keep the same device names and motor types in the robot configuration.
 
 ## Controls
 
-| Gamepad 1 control | Action |
+| PS4 controller 1 control | Action |
 | --- | --- |
 | Right stick Y | Forward/backward |
 | Right stick X | Strafe |
 | Left stick X | Rotate |
-| Circle / B | Run intake forward; it continues after release |
-| Square / X | Run intake in reverse; it continues after release |
+| Circle | Run intake forward; it continues after release |
+| Square | Run intake in reverse; it continues after release |
 | D-pad up | Enable shooter |
 | D-pad down | Disable shooter |
 | D-pad right / left | Increase / decrease both shooter velocity thresholds once per press |
-| Right bumper | Feed while held, only when shooter velocity exceeds the minimum |
-| Left bumper | Reverse windmill while held, even with shooter disabled |
+| R1 | Feed while held, only when shooter velocity exceeds the minimum |
+| L1 | Reverse windmill while held, even with shooter disabled |
 | STOP | Stop all drive motors, intake motor, launcher, and windmill |
 
-Square overrides circle, D-pad down overrides up, and left bumper overrides right
-bumper when both corresponding controls are held. Intake latching matches the
+Square overrides circle, D-pad down overrides up, and L1 overrides R1
+when both corresponding controls are held. Intake latching matches the
 source code; there is no separate intake-off button.
 
 ## Deploy

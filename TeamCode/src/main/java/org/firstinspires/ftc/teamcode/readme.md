@@ -4,7 +4,7 @@ All four robot mechanisms return Ivy Command objects, following
 https://nextftc.dev/robot/mechanisms/. Creating a command does not apply its action;
 schedule it or compose it with then()/with(). Each action requires its mechanism.
 Drivetrain uses Pedro's follower for manual driving; intake and transfer use NextMotor.
-Shooter uses the FTC SDK's DcMotorEx with the hub's built-in velocity PIDF controller.
+Shooter uses NextFTC PIDController plus SimpleFeedforward to control DcMotorEx power.
 
 Shooter's default command reads D-pad up/down when initialized with a gamepad.
 Robot.initialize(hardwareMap) leaves that gamepad unset for autonomous and tuning;
@@ -12,12 +12,30 @@ Robot.initialize(hardwareMap, gamepad1) enables the supplied TeleOp controls.
 NextOpMode runs the default commands and NextMotor updates automatically.
 Other button bindings and drive speed scales live in StarterBotTeleop.
 
+## PS4 controller bindings
+
+| Controller | Control | Action |
+| --- | --- | --- |
+| 1 | Right stick Y / X | Forward/backward / strafe |
+| 1 | Left stick X | Turn |
+| 1 | Circle | Start intake |
+| 1 | Square | Reverse intake |
+| 1 | D-pad up / down | Enable / stop shooter |
+| 1 | D-pad right / left | Increase / decrease shooter target velocity |
+| 1 | R1 (hold) | Run transfer forward |
+| 1 | L1 (hold) | Reverse transfer; takes priority over R1 |
+| 2, turret TeleOps | Circle | Stop turret aiming |
+| 2, turret TeleOps | D-pad up | Resume automatic turret aiming |
+
+The SDK calls PS4 L1 and R1 `left_bumper` and `right_bumper`. Face-button bindings
+use NextFTC's PlayStation names: Circle, Square, Cross, and Triangle.
+
 The drivetrain creates its follower through Constants.create(hardwareMap), using
 the same FL/FR/BL/BR motor directions and Pinpoint configuration as Pedro autonomous.
 Each execution of the TeleOp drive command calls follower.manual() then follower.update().
 Right stick controls forward/strafe; left-stick X controls turning, as before.
 Lateral/turn signs are mapped to preserve the previous wheel outputs. Combined inputs
-are normalized before applying the 100%, 30%, or 50% drive scale. Cancelling the drive
+are normalized before applying the configured drive scale (1.0 in current TeleOps). Cancelling the drive
 command or stopping the OpMode immediately stops and brakes Pedro's drivetrain.
 
 ## Autonomous example
@@ -75,46 +93,38 @@ with a timeout you choose. A readiness wait has no built-in timeout.
 
 ## Shooter tuning
 
-FTC AutoTune v1.4.3 (core and FTC integration) is installed in TeamCode.
-Perform a full Robot Controller APK install after this dependency change;
-a Sloth-only upload cannot install the new library.
+Select "Velocity Tuning" in the Tuning group. The shooter uses NextFTC
+`PIDController` plus `SimpleFeedforward`, with `DcMotorEx` in `RUN_WITHOUT_ENCODER`
+mode. The controller combines PID output and velocity feedforward, then clamps
+motor power to [0, 1].
 
-1. Select "Shooter AutoTune" in the Tuning group. It controls only `launcher`.
-   Its settings are available in Panels Configurables as ShooterAutoTune;
-   edit before PLAY. Defaults match the shooter target of 1400 ticks/second.
-2. Keep the flywheel clear. PLAY starts a relay test that reverses power,
-   followed by a feedforward sweep at 0.5, 0.75, and 1.0 motor power.
-   Progress and candidate gains appear on Driver Station telemetry and Panels.
-   A timeout stops the motor; adjust relayAmplitude/targetVelocity and rerun.
-3. After successful tuning, hold gamepad1 A to test the classic ZN candidate;
-   release A to stop. STOP always removes motor power.
-4. Copy the chosen candidate's kP/kI/kD/kF into Shooter.P/I/D/F and rebuild.
-   They start at zero because the previous REV Hub gains are incompatible.
-   Until gains are entered, normal TeleOp/autonomous shooter output is zero.
-   This version of PIDMaster tunes in ticks/second; RPM is display-only.
-5. To check gains under feeding load, run "Velocity Tuning" and enter the
-   candidate in p/i/d/f, then set targetVelocity in ticks/second. These are
-   software gains, with motor power as output. targetVelocity=0 stops the
-   shooter. runTransfer runs intake at -0.7 and both transfer motors at 0.8;
-   it resets to false at INIT, PLAY, and STOP. Panels edits are not saved to source.
+1. Edit `p`, `i`, `d`, and `f` in Panels Configurables. Their defaults are
+   zero until tuned. The previous REV Hub gains use different units and must
+   be retuned. `p`, `i`, and `d` control velocity error; `f` is motor power per
+   tick/second of target velocity. With all gains at zero, the shooter stays stopped.
+2. Set `targetVelocity` in encoder ticks/second; zero stops the shooter.
+   Changes apply each loop. Non-finite gains stop output until valid gains return.
+3. Enable `runTransfer` to run the intake at -0.7 and both transfer motors at 0.8.
+   It resets to false at INIT, PLAY, and STOP.
+4. Graph "Target Velocity (ticks/s)" and "Measured Velocity (ticks/s)" in Panels.
+   RPM uses 28 encoder ticks per revolution; confirm that value for the motor.
+5. Panels edits are temporary. Update `DEFAULT_P`, `DEFAULT_I`, `DEFAULT_D`, and
+   `DEFAULT_F` in `Shooter.java` to retain tuned gains; the tuner uses those defaults.
 
 Panels is available on the robot Wi-Fi at http://192.168.43.1:8001 on a Control Hub
-(http://192.168.49.1:8001 on a phone RC). Graph "Target Velocity (ticks/s)" and
-"Measured Velocity (ticks/s)" in Velocity Tuning. RPM uses Shooter.TICKS_PER_REV,
-currently 28 as in the previous tuner; confirm that value for your actual motor.
-The AutoTune library's separate dashboard is optional; the shooter tuner uses Panels.
+(http://192.168.49.1:8001 on a phone RC).
 
-Shooter uses AutoTune's PIDFController with DcMotorEx in RUN_WITHOUT_ENCODER mode,
-reads absolute encoder velocity in ticks/second, and writes power bounded to [0, 1].
-Targets remain in ticks/second (default 1400, minimum 1300). Controller state resets
-when the target/gains change or the shooter stops. Non-finite gains stop output
-until valid values are restored. NextFTC calls Shooter.periodic() every loop;
-plain SDK autonomous OpModes explicitly call it after Scheduler.execute().
-Shooter.stop() stops immediately; use Shooter.stopCommand() in command sequences.
+Normal shooter control starts with a target of 1375 ticks/second. The readiness
+threshold is 100 ticks/second below the target, with a minimum of zero.
+`isReady()` also requires the shooter to be enabled, valid gains, and a positive target.
+`stop()` stops immediately; use `stopCommand()` in command sequences.
+The controller resets when the target, gains, or enabled state changes.
+NextFTC calls `Shooter.periodic()` each loop; plain SDK autos call it after
+`Scheduler.execute()` so velocity stays regulated throughout the routine.
 
 TeleOp keeps circle/square latched intake direction, up/down shooter on/stop,
-left/right target adjustment, held bumpers for transfer (left wins), and the existing
-100%, 30%, and 50% drive variants. Use stopImmediately() only for initialization
+left/right target adjustment, held L1/R1 for transfer (L1 wins), and full-speed driving.
+Use stopImmediately() only for initialization
 and lifecycle cleanup; use stop() as a command during a routine.
 
 The Pedro tuning procedures continue to use Pedro's own drivetrain/localizer APIs.

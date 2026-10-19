@@ -20,12 +20,17 @@
  *   SOFTWARE.
  */
 
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.opmodes;
 
 import com.pedropathing.ivy.Command;
+
+import org.firstinspires.ftc.teamcode.OpModeStorage;
+import org.firstinspires.ftc.teamcode.Robot;
+
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
+import dev.nextftc.robot.triggers.Trigger;
 
 public abstract class StarterBotTeleop extends NextOpMode {
     protected final Robot robot;
@@ -51,9 +56,10 @@ public abstract class StarterBotTeleop extends NextOpMode {
         driver.dpadLeft().onTrue(robot.shooter.instant(
                 () -> robot.shooter.adjustVelocity(-velocityStep)));
 
-        // One held command preserves left-bumper priority when both are pressed.
-        driver.leftBumper().or(() -> gamepad1.right_bumper)
-                .whileTrue(robot.transfer.run(() -> gamepad1.left_bumper ? -1.0 : 1.0));
+        // PS4 L1/R1 use the SDK's left/right bumper inputs; L1 has priority.
+        Trigger l1 = driver.leftBumper();
+        Trigger r1 = driver.rightBumper();
+        l1.or(r1).whileTrue(robot.transfer.run(() -> l1.getAsBoolean() ? -1.0 : 1.0));
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -61,6 +67,8 @@ public abstract class StarterBotTeleop extends NextOpMode {
 
     @Override
     public void start() {
+        robot.drivetrain.getFollower().setPose(OpModeStorage.autonomousEndPose);
+        robot.drivetrain.getFollower().update();
         driveCommand.schedule();
     }
 
