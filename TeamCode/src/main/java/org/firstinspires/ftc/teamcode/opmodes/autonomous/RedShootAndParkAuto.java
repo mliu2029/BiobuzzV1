@@ -1,28 +1,28 @@
 package org.firstinspires.ftc.teamcode.opmodes.autonomous;
 
 import static com.pedropathing.api.Paths.curve;
-import static com.pedropathing.ivy.Scheduler.schedule;
 import static com.pedropathing.ivy.groups.Groups.sequential;
-import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
 import com.pedropathing.api.PoseFactory;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
-import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
-import com.qualcomm.hardware.lynx.LynxModule;
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import dev.nextftc.hardware.actuators.NextMotor;
-import org.firstinspires.ftc.teamcode.OpModeStorage;
+import dev.nextftc.robot.opmode.BulkReadHook;
+import dev.nextftc.robot.opmode.NextAutonomous;
+import dev.nextftc.robot.opmode.NextOpMode;
+import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
+import org.firstinspires.ftc.teamcode.subsystems.Intake;
+import org.firstinspires.ftc.teamcode.subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.subsystems.Transfer;
 
-@Autonomous(name = "red hive+park", group = "Pedro")
-public class RedShootAndParkAuto extends OpMode {
-    private final Robot robot = new Robot();
-    private Follower follower;
+@NextAutonomous(name = "red hive+park", group = "Pedro")
+public class RedShootAndParkAuto extends NextOpMode {
+    private final Robot robot;
+    private final Follower follower;
     private final PoseFactory poseFactory = PoseFactory.degrees();
     private String currentPath = "Ready";
 
@@ -30,56 +30,54 @@ public class RedShootAndParkAuto extends OpMode {
     private final Pose park = poseFactory.of(14.2259, 95.9422, 0);
     private final Pose parkControlPose = poseFactory.of(22.7118, 50.0193, 0);
 
-    private Path runToParkPath() {
-        return curve(startPose, parkControlPose, park).linear(startPose, park);
+    private Path runToPark;
+
+    public RedShootAndParkAuto(Robot robot) {
+        super(robot, BulkReadHook.INSTANCE);
+        this.robot = robot;
+        robot.initialize(hardwareMap);
+        follower = Drivetrain.INSTANCE.getFollower();
+        follower.setPose(startPose);
+        follower.update();
+        buildPaths();
+        telemetry.addData("Status", "Ready");
+        telemetry.update();
     }
 
-    private Command autoRoutine() {
+    public void buildPaths() {
+        runToPark = curve(startPose, parkControlPose, park).linear(startPose, park);
+    }
+
+    private Command auto() {
         return sequential(
                 Commands.instant(() -> currentPath = "Shooting"),
-                robot.shooter.runAtVelocity(robot.shooter.getTargetVelocity()),
+                Shooter.INSTANCE.runFlywheel,
                 Commands.waitMs(500),
-                robot.transfer.run().with(robot.intake.run())
-                        .raceWith(Commands.waitMs(5000)),
-                Commands.instant(() -> currentPath = "Run to Park"),
-                follow(follower, runToParkPath())
-                        .setDone(() -> follower.atParametricEnd() && !follower.isBusy())
-                        .requiring(robot.drivetrain),
+                Intake.INSTANCE.runIntake,
+                Transfer.INSTANCE.runTransfer(0.8),
+                Commands.waitMs(5000),
+                Transfer.INSTANCE.stopTransfer,
+                followPath(runToPark, "Run to Park"),
                 robot.stop(),
                 Commands.instant(() -> currentPath = "Finished")
         );
     }
 
-    @Override
-    public void init() {
-        Scheduler.reset();
-        currentPath = "Ready";
-        for (LynxModule hub : hardwareMap.getAll(LynxModule.class)) {
-            hub.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO);
-        }
-        robot.initialize(hardwareMap);
-        follower = robot.drivetrain.getFollower();
-        follower.setPose(startPose);
-        follower.update();
-
-        telemetry.addData("Status", "Ready");
-        telemetry.addData("Current Path", currentPath);
-        telemetry.update();
+    private Command followPath(Path path, String pathName) {
+        return sequential(
+                Commands.instant(() -> currentPath = pathName),
+                Drivetrain.INSTANCE.followPath(path)
+        );
     }
 
     @Override
     public void start() {
-        schedule(autoRoutine());
+        auto().schedule();
     }
 
     @Override
-    public void loop() {
+    public void periodic() {
         follower.update();
-        Scheduler.execute();
-        robot.shooter.periodic();
-        // Plain SDK OpModes must update NextMotor outputs explicitly.
-        NextMotor.Companion.getMotorEventLoop().poll();
-
         telemetry.addData("Current Path", currentPath);
         telemetry.addData("X", follower.pose().x());
         telemetry.addData("Y", follower.pose().y());
@@ -89,10 +87,9 @@ public class RedShootAndParkAuto extends OpMode {
     }
 
     @Override
-    public void stop() {
+    public void end() {
         try {
-            if (follower != null) OpModeStorage.autonomousEndPose = follower.pose();
-            Scheduler.reset();
+            OpModeStorage.autonomousEndPose = follower.pose();
         } finally {
             robot.stopImmediately();
         }

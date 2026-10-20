@@ -1,21 +1,22 @@
 package org.firstinspires.ftc.teamcode.opmodes;
 
 import dev.nextftc.robot.triggers.CommandGamepad;
-import org.firstinspires.ftc.teamcode.OpModeStorage;
+import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.aiming.TurretCalculations.Alliance;
-import org.firstinspires.ftc.teamcode.aiming.TurretConfig;
+import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
+import org.firstinspires.ftc.teamcode.subsystems.Turret;
+import org.firstinspires.ftc.teamcode.util.Calculations.Alliance;
 
-public abstract class BioBuzzTurretTeleop extends StarterBotTeleop {
+public abstract class BioBuzzTurretTeleop extends TeleOp {
     private final Alliance alliance;
 
     protected BioBuzzTurretTeleop(Robot robot, Alliance alliance) {
-        super(robot, 1.0, 25);
+        super(robot);
         this.alliance = alliance;
-        robot.turret.initialize(hardwareMap, () -> robot.drivetrain.getFollower().pose(), alliance);
+        Turret.INSTANCE.initialize(hardwareMap, alliance);
         CommandGamepad operator = new CommandGamepad(gamepad2);
-        operator.dpadUp().onTrue(robot.turret.aimAutomatically());
-        operator.circle().onTrue(robot.turret.stop());
+        operator.dpadUp().onTrue(Turret.INSTANCE.aimTurret);
+        operator.circle().onTrue(Turret.INSTANCE.stopTurret);
     }
 
     @Override
@@ -23,27 +24,26 @@ public abstract class BioBuzzTurretTeleop extends StarterBotTeleop {
         telemetry.addLine("Turret encoder reset to forward zero.");
         telemetry.addData("TeleOp starting pose", OpModeStorage.autonomousEndPose);
         telemetry.addData("Alliance", alliance);
-        telemetry.addData("Turret encoder ticks", robot.turret.getEncoderTicks());
+        telemetry.addData("Turret encoder ticks", Turret.INSTANCE.getEncoderTicks());
         telemetry.update();
     }
 
     @Override
     public void start() {
         super.start();
-        robot.turret.aimAutomatically().schedule();
+        Turret.INSTANCE.aimTurret.schedule();
     }
 
     @Override
     public void periodic() {
         telemetry.addData("Alliance", alliance);
-        telemetry.addData("Halfway Y", TurretConfig.halfwayY);
-        telemetry.addData("Aiming at: ", robot.turret.getTarget());
-        telemetry.addData("Aim mode", robot.turret.getMode());
-        telemetry.addData("Turret degrees", robot.turret.getDegrees());
-        telemetry.addData("Turret encoder ticks", robot.turret.getEncoderTicks());
-        telemetry.addData("Target degrees", robot.turret.getTargetDegrees());
-        telemetry.addData("Aligned (angular only)", robot.turret.isAligned());
-        telemetry.addData("Pose", robot.drivetrain.getFollower().pose());
+        telemetry.addData("Aiming at: ", Turret.INSTANCE.getTarget());
+        telemetry.addData("Aim mode", Turret.INSTANCE.getMode());
+        telemetry.addData("Turret degrees", Turret.INSTANCE.getDegrees());
+        telemetry.addData("Turret encoder ticks", Turret.INSTANCE.getEncoderTicks());
+        telemetry.addData("Target degrees", Turret.INSTANCE.getTargetDegrees());
+        telemetry.addData("Aligned: ", Turret.INSTANCE.isAligned());
+        telemetry.addData("Pose", Drivetrain.INSTANCE.getFollower().pose());
         super.periodic();
     }
 }

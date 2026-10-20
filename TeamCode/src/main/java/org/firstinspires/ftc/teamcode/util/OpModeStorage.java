@@ -1,8 +1,7 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.util;
 
 import com.pedropathing.math.Pose;
 
-/** Retains the autonomous pose until the Robot Controller process restarts. */
 public final class OpModeStorage {
     private OpModeStorage() { }
 

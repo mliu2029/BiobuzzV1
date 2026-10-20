@@ -1,8 +1,9 @@
-package org.firstinspires.ftc.teamcode.opmodes;
+package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
 import dev.nextftc.robot.opmode.NextTeleop;
 import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.aiming.TurretCalculations.Alliance;
+import org.firstinspires.ftc.teamcode.opmodes.BioBuzzTurretTeleop;
+import org.firstinspires.ftc.teamcode.util.Calculations.Alliance;
 
 @NextTeleop(name = "red turret teleop", group = "BioBuzz")
 public class BioBuzzRedTurretTeleop extends BioBuzzTurretTeleop {

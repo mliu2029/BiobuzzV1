@@ -24,42 +24,49 @@ package org.firstinspires.ftc.teamcode.opmodes;
 
 import com.pedropathing.ivy.Command;
 
-import org.firstinspires.ftc.teamcode.OpModeStorage;
+import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
+import org.firstinspires.ftc.teamcode.subsystems.Intake;
+import org.firstinspires.ftc.teamcode.subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.subsystems.Transfer;
 
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
 import dev.nextftc.robot.triggers.Trigger;
 
-public abstract class StarterBotTeleop extends NextOpMode {
+public abstract class TeleOp extends NextOpMode {
+    private static final int VELOCITY_STEP = 25;
     protected final Robot robot;
     private final Command driveCommand;
 
-    protected StarterBotTeleop(Robot robot, double driveScale, int velocityStep) {
+    protected TeleOp(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
-        robot.initialize(hardwareMap, gamepad1);
+        robot.initialize(hardwareMap);
 
         CommandGamepad driver = new CommandGamepad(gamepad1);
-        driveCommand = robot.drivetrain.drive(
+        driveCommand = Drivetrain.INSTANCE.drive(
                 () -> -gamepad1.right_stick_y,
                 () -> gamepad1.right_stick_x,
-                () -> gamepad1.left_stick_x,
-                driveScale);
+                () -> gamepad1.left_stick_x);
 
-        // Shooter's default command handles D-pad up/down.
-        driver.circle().onTrue(robot.intake.run());
-        driver.square().onTrue(robot.intake.reverse());
-        driver.dpadRight().onTrue(robot.shooter.instant(
-                () -> robot.shooter.adjustVelocity(velocityStep)));
-        driver.dpadLeft().onTrue(robot.shooter.instant(
-                () -> robot.shooter.adjustVelocity(-velocityStep)));
+        driver.circle().onTrue(Intake.INSTANCE.runIntake);
+        driver.square().onTrue(Intake.INSTANCE.runIntakeReverse);
+        driver.dpadUp().and(driver.dpadDown().negate()).onTrue(Shooter.INSTANCE.runFlywheel);
+        driver.dpadDown().onTrue(Shooter.INSTANCE.stopFlywheel);
+        driver.dpadRight().onTrue(Shooter.INSTANCE.instant(
+                () -> Shooter.INSTANCE.adjustVelocity(VELOCITY_STEP)));
+        driver.dpadLeft().onTrue(Shooter.INSTANCE.instant(
+                () -> Shooter.INSTANCE.adjustVelocity(-VELOCITY_STEP)));
 
         // PS4 L1/R1 use the SDK's left/right bumper inputs; L1 has priority.
         Trigger l1 = driver.leftBumper();
         Trigger r1 = driver.rightBumper();
-        l1.or(r1).whileTrue(robot.transfer.run(() -> l1.getAsBoolean() ? -1.0 : 1.0));
+        l1.onTrue(Transfer.INSTANCE.runTransfer(-1.0));
+        r1.and(l1.negate()).onTrue(Transfer.INSTANCE.runTransfer(1.0));
+        l1.or(r1).onFalse(Transfer.INSTANCE.stopTransfer);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -67,15 +74,15 @@ public abstract class StarterBotTeleop extends NextOpMode {
 
     @Override
     public void start() {
-        robot.drivetrain.getFollower().setPose(OpModeStorage.autonomousEndPose);
-        robot.drivetrain.getFollower().update();
+        Drivetrain.INSTANCE.getFollower().setPose(OpModeStorage.autonomousEndPose);
+        Drivetrain.INSTANCE.getFollower().update();
         driveCommand.schedule();
     }
 
     @Override
     public void periodic() {
-        telemetry.addData("TargetVelocity", robot.shooter.getTargetVelocity());
-        telemetry.addData("Shooter Velocity", robot.shooter.getVelocity());
+        telemetry.addData("TargetVelocity", Shooter.INSTANCE.getTargetVelocity());
+        telemetry.addData("Shooter Velocity", Shooter.INSTANCE.getVelocity());
         telemetry.update();
     }
 
