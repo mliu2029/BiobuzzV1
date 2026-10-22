@@ -61,12 +61,9 @@ public abstract class TeleOp extends NextOpMode {
         driver.dpadLeft().onTrue(Shooter.INSTANCE.instant(
                 () -> Shooter.INSTANCE.adjustVelocity(-VELOCITY_STEP)));
 
-        // PS4 L1/R1 use the SDK's left/right bumper inputs; L1 has priority.
-        Trigger l1 = driver.leftBumper();
-        Trigger r1 = driver.rightBumper();
-        l1.onTrue(Transfer.INSTANCE.runTransfer(-1.0));
-        r1.and(l1.negate()).onTrue(Transfer.INSTANCE.runTransfer(1.0));
-        l1.or(r1).onFalse(Transfer.INSTANCE.stopTransfer);
+
+        driver.rightBumper().onTrue(Transfer.INSTANCE.openBlocker);
+        driver.rightBumper().onFalse(Transfer.INSTANCE.closeBlocker);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();

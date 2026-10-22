@@ -54,9 +54,9 @@ public class RedShootAndParkAuto extends NextOpMode {
                 Shooter.INSTANCE.runFlywheel,
                 Commands.waitMs(500),
                 Intake.INSTANCE.runIntake,
-                Transfer.INSTANCE.runTransfer(0.8),
+                Transfer.INSTANCE.openBlocker,
                 Commands.waitMs(5000),
-                Transfer.INSTANCE.stopTransfer,
+                Transfer.INSTANCE.closeBlocker,
                 followPath(runToPark, "Run to Park"),
                 robot.stop(),
                 Commands.instant(() -> currentPath = "Finished")

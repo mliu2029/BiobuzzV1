@@ -49,7 +49,7 @@ public class VelocityPidTuning extends NextOpMode {
 
         boolean feeding = runTransfer;
         Intake.INSTANCE.setPower(feeding ? -0.7 : 0.0).schedule();
-        Transfer.INSTANCE.runTransfer(feeding ? 0.8 : 0.0).schedule();
+        (feeding ? Transfer.INSTANCE.openBlocker : Transfer.INSTANCE.closeBlocker).schedule();
 
         Shooter.INSTANCE.setVelocity(targetVelocity);
         double currentVelocity = Shooter.INSTANCE.getVelocity();

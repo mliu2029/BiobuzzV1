@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.util.TurretConfig;
 public class Turret implements Mechanism {
     public static final Turret INSTANCE = new Turret();
     private Turret() { }
-    private NextMotor motor;
+    private NextMotor turret;
     private DcMotorImplEx encoder;
     private final PIDCoefficients gains = new PIDCoefficients(0, 0, 0);
     private final PIDController pid = new PIDController(gains);
@@ -39,15 +39,14 @@ public class Turret implements Mechanism {
     });
     public final Command stopTurret = instant(this::stopImmediately);
 
-    /** Initialize with the turret physically forward; reset its encoder to zero. */
     public void initialize(HardwareMap hardwareMap, Alliance alliance) {
         this.alliance = Objects.requireNonNull(alliance, "Alliance is required");
         encoder = hardwareMap.get(DcMotorImplEx.class, "turret");
         encoder.setPower(0);
         encoder.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         encoder.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        if (motor == null) motor = new NextMotor(() -> encoder);
-        motor.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
+        if (turret == null) turret = new NextMotor(() -> encoder);
+        turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         Limelight.INSTANCE.initialize(hardwareMap);
         target = alliance.close;
         stopImmediately();
@@ -69,7 +68,7 @@ public class Turret implements Mechanism {
 
     @Override
     public void periodic() {
-        if (motor == null) return;
+        if (turret == null) return;
         targetDegrees = Double.NaN;
         if (!enabled || !calibrated()) {
             mode = !enabled ? "OFF" : "CALIBRATION REQUIRED";
@@ -177,9 +176,9 @@ public class Turret implements Mechanism {
     }
 
     private void applyPower(double power) {
-        if (motor == null) return;
-        motor.setThrottle(Double.isFinite(power) ? power : 0);
-        motor.update();
+        if (turret == null) return;
+        turret.setThrottle(Double.isFinite(power) ? power : 0);
+        turret.update();
     }
 
     public double getDegrees() {

@@ -37,14 +37,14 @@ public class Shooter implements Mechanism {
     public final Command stopFlywheel = instant(this::stopImmediately);
 
     public void initialize(HardwareMap hardwareMap) {
-        initializeMotor(hardwareMap.get(DcMotorEx.class, "launcher"));
+        initializeMotor(hardwareMap.get(DcMotorEx.class, "shooter"));
     }
 
-    void initializeMotor(DcMotorEx launcher) {
-        this.shooter = launcher;
+    void initializeMotor(DcMotorEx shooter) {
+        this.shooter = shooter;
         targetVelocity = DEFAULT_TARGET_VELOCITY;
-        launcher.setPower(0);
-        launcher.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        shooter.setPower(0);
+        shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         setPIDFCoefficients(DEFAULT_P, DEFAULT_I, DEFAULT_D, DEFAULT_F);
         stopImmediately();
     }

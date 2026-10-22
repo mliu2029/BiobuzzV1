@@ -1,25 +1,26 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
-import dev.nextftc.hardware.actuators.NextMotor;
+import dev.nextftc.hardware.actuators.NextServo;
 import dev.nextftc.robot.Mechanism;
 
+@Configurable
 public class Transfer implements Mechanism {
+    // TODO: tune positions
+    public static volatile double OPEN_POSITION = 0.5;
+    public static volatile double BLOCKED_POSITION = 0.5;
+
     public static final Transfer INSTANCE = new Transfer();
-    private final NextMotor transfer = new NextMotor("transfer");
+    private final NextServo transfer = new NextServo("transfer");
 
     private Transfer() {
-        transfer.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
     }
 
-    public final Command stopTransfer = runTransfer(0.0);
-
-    public Command runTransfer(double power) {
-        return instant(() -> transfer.setThrottle(power));
-    }
+    public final Command openBlocker = instant(() -> transfer.setPosition(OPEN_POSITION));
+    public final Command closeBlocker = instant(this::stopImmediately);
 
     public void stopImmediately() {
-        transfer.setThrottle(0.0);
-        transfer.update();
+        transfer.setPosition(BLOCKED_POSITION);
     }
 }
