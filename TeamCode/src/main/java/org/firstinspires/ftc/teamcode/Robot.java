@@ -11,16 +11,18 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
-import org.firstinspires.ftc.teamcode.subsystems.Limelight;
+// import org.firstinspires.ftc.teamcode.subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.subsystems.Transfer;
-import org.firstinspires.ftc.teamcode.subsystems.Turret;
+// import org.firstinspires.ftc.teamcode.subsystems.Transfer;
+// import org.firstinspires.ftc.teamcode.subsystems.Turret;
 
-/** Registers Decode-style subsystem singletons with NextFTC v2. */
+/** Registers the drivetrain, intake, and dual-motor shooter. */
 public class Robot implements NextRobot {
     private final Set<Mechanism> subsystems = Collections.unmodifiableSet(
-            new LinkedHashSet<>(Arrays.asList(Drivetrain.INSTANCE, Intake.INSTANCE,
-                    Shooter.INSTANCE, Transfer.INSTANCE, Limelight.INSTANCE, Turret.INSTANCE)));
+            new LinkedHashSet<>(Arrays.asList(Drivetrain.INSTANCE, Intake.INSTANCE, Shooter.INSTANCE
+                    // , Transfer.INSTANCE,
+                    // Limelight.INSTANCE, Turret.INSTANCE
+            )));
 
     @Override
     public Set<Mechanism> getMechanisms() {
@@ -29,11 +31,12 @@ public class Robot implements NextRobot {
 
     public void initialize(HardwareMap hardwareMap) {
         Drivetrain.INSTANCE.initialize(hardwareMap);
-        Intake.INSTANCE.stopImmediately();
         Shooter.INSTANCE.initialize(hardwareMap);
-        Transfer.INSTANCE.stopImmediately();
-        Turret.INSTANCE.stopImmediately();
-        Limelight.INSTANCE.stopImmediately();
+        Intake.INSTANCE.stopImmediately();
+        // Transfer, turret, and camera hardware remain disabled.
+        // Transfer.INSTANCE.stopImmediately();
+        // Turret.INSTANCE.stopImmediately();
+        // Limelight.INSTANCE.stopImmediately();
     }
 
     public Command stop() {
@@ -44,8 +47,8 @@ public class Robot implements NextRobot {
         Drivetrain.INSTANCE.stopImmediately();
         Intake.INSTANCE.stopImmediately();
         Shooter.INSTANCE.stopImmediately();
-        Transfer.INSTANCE.stopImmediately();
-        Turret.INSTANCE.stopImmediately();
-        Limelight.INSTANCE.stopImmediately();
+        // Transfer.INSTANCE.stopImmediately();
+        // Turret.INSTANCE.stopImmediately();
+        // Limelight.INSTANCE.stopImmediately();
     }
 }

@@ -41,13 +41,14 @@ public class Turret implements Mechanism {
 
     public void initialize(HardwareMap hardwareMap, Alliance alliance) {
         this.alliance = Objects.requireNonNull(alliance, "Alliance is required");
-        encoder = hardwareMap.get(DcMotorImplEx.class, "turret");
-        encoder.setPower(0);
-        encoder.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        encoder.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        if (turret == null) turret = new NextMotor(() -> encoder);
-        turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
-        Limelight.INSTANCE.initialize(hardwareMap);
+        // Hardware disabled for drivetrain-only testing.
+        // encoder = hardwareMap.get(DcMotorImplEx.class, "turret");
+        // encoder.setPower(0);
+        // encoder.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        // encoder.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        // if (turret == null) turret = new NextMotor(() -> encoder);
+        // turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
+        // Limelight.INSTANCE.initialize(hardwareMap);
         target = alliance.close;
         stopImmediately();
     }

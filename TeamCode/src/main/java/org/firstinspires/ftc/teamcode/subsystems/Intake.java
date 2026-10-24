@@ -10,6 +10,7 @@ public class Intake implements Mechanism {
 
     private Intake() {
         intake.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
+        intake.setDirection(NextMotor.Direction.REVERSE);
     }
 
     public final Command runIntake = setPower(1.0);
@@ -17,7 +18,9 @@ public class Intake implements Mechanism {
     public final Command stopIntake = setPower(0.0);
 
     public Command setPower(double power) {
-        return instant(() -> intake.setThrottle(power));
+        return instant(() -> {
+            intake.setThrottle(power);
+        });
     }
 
     public void stopImmediately() {

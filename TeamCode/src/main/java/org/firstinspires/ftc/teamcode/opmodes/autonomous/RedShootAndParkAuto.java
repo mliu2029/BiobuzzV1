@@ -12,14 +12,17 @@ import com.pedropathing.paths.Path;
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextAutonomous;
 import dev.nextftc.robot.opmode.NextOpMode;
+
+import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
-import org.firstinspires.ftc.teamcode.subsystems.Intake;
+//import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.subsystems.Transfer;
+// import org.firstinspires.ftc.teamcode.subsystems.Transfer;
 
-@NextAutonomous(name = "red hive+park", group = "Pedro")
+// Temporarily hidden while non-drive hardware is disabled.
+// @NextAutonomous(name = "red hive+park", group = "Pedro")
 public class RedShootAndParkAuto extends NextOpMode {
     private final Robot robot;
     private final Follower follower;
@@ -54,9 +57,9 @@ public class RedShootAndParkAuto extends NextOpMode {
                 Shooter.INSTANCE.runFlywheel,
                 Commands.waitMs(500),
                 Intake.INSTANCE.runIntake,
-                Transfer.INSTANCE.openBlocker,
+                // Transfer.INSTANCE.openBlocker,
                 Commands.waitMs(5000),
-                Transfer.INSTANCE.closeBlocker,
+                // Transfer.INSTANCE.closeBlocker,
                 followPath(runToPark, "Run to Park"),
                 robot.stop(),
                 Commands.instant(() -> currentPath = "Finished")

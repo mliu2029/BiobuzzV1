@@ -23,23 +23,20 @@
 package org.firstinspires.ftc.teamcode.opmodes;
 
 import com.pedropathing.ivy.Command;
-import com.skeletonarmy.marrow.weaver.PathConfig;
-import com.skeletonarmy.marrow.weaver.Weaver;
+import com.pedropathing.math.Pose;
 
 import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.subsystems.Transfer;
+// import org.firstinspires.ftc.teamcode.subsystems.Transfer;
 
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
-import dev.nextftc.robot.triggers.Trigger;
 
 public abstract class TeleOp extends NextOpMode {
-
     private static final int VELOCITY_STEP = 25;
     protected final Robot robot;
     private final Command driveCommand;
@@ -64,9 +61,8 @@ public abstract class TeleOp extends NextOpMode {
         driver.dpadLeft().onTrue(Shooter.INSTANCE.instant(
                 () -> Shooter.INSTANCE.adjustVelocity(-VELOCITY_STEP)));
 
-
-        driver.rightBumper().onTrue(Transfer.INSTANCE.openBlocker);
-        driver.rightBumper().onFalse(Transfer.INSTANCE.closeBlocker);
+        // driver.rightBumper().onTrue(Transfer.INSTANCE.openBlocker);
+        // driver.rightBumper().onFalse(Transfer.INSTANCE.closeBlocker);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -74,19 +70,19 @@ public abstract class TeleOp extends NextOpMode {
 
     @Override
     public void start() {
-        Drivetrain.INSTANCE.getFollower().setPose(OpModeStorage.autonomousEndPose);
+        Pose startingPose = OpModeStorage.autonomousEndPose;
+        Drivetrain.INSTANCE.getFollower().setPose(
+                startingPose != null ? startingPose : Pose.zero());
         Drivetrain.INSTANCE.getFollower().update();
         driveCommand.schedule();
-        Weaver.setConfig(new PathConfig()
-                .intakeWidth(8.0)
-                .robotWidth(16.0)
-                .robotHeight(16.0));
     }
 
     @Override
     public void periodic() {
-        telemetry.addData("TargetVelocity", Shooter.INSTANCE.getTargetVelocity());
-        telemetry.addData("Shooter Velocity", Shooter.INSTANCE.getVelocity());
+        telemetry.addData("Shooter target (ticks/s)", Shooter.INSTANCE.getTargetVelocity());
+        telemetry.addData("Flywheel velocity (ticks/s)", Shooter.INSTANCE.getVelocity1());
+        telemetry.addData("Flywheel2 velocity (ticks/s)", Shooter.INSTANCE.getVelocity2());
+        telemetry.addData("Pose", Drivetrain.INSTANCE.getFollower().pose());
         telemetry.update();
     }
 
