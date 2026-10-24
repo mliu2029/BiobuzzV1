@@ -2,6 +2,35 @@
 
 The structure follows DecodeV3, adapted to NextFTC v2 0.2.1 and Pedro 3.
 
+## Current hardware and dual-motor shooter
+
+`Robot` currently registers the drivetrain, intake, and shooter. Transfer, turret,
+and camera initialization remain disabled; their controls below describe the full
+robot configuration. The intake motor's hardware name is `intake`. Controller 1
+Circle starts it at +1 and Square reverses it at -1; INIT and STOP set its power to
+zero. In `Velocity Tuning`, `runIntake` runs the intake at -0.7 when true
+and stops it when false; the transfer blocker remains disabled.
+
+Configure two matching shooter motors and connect both encoders, named `flywheel`
+and `flywheel2` in the Robot Controller hardware configuration. Both use
+`RUN_WITHOUT_ENCODER` with software velocity PID in raw encoder ticks/second.
+They share one target velocity and one set of P/I/D/F gains. Each motor has its own
+PID controller and encoder feedback so a slower motor receives its own correction.
+Both directions currently default to `FORWARD`; if the mounting requires one motor
+to rotate oppositely, change that motor's direction in `Shooter.initializeMotors()`
+and confirm its measured velocity is positive in the intended shooting direction.
+
+Controller 1 D-pad up starts both motors; down stops both. Right/left changes their
+shared target by 25 ticks/s. `Velocity Tuning` exposes shared P/I/D/F and
+`targetVelocity` in Panels and reports each motor's speed and power separately.
+The initial target is 1375 ticks/s; gains default to zero and need hardware tuning.
+`Shooter.isReady()` requires both motors to reach at least target minus 100 ticks/s.
+The older `getVelocity()` and `getPower()` methods now return the mean of both
+motors; use `getVelocity1/2()` and `getPower1/2()` to inspect them individually.
+Invalid encoder readings or gains stop both outputs. STOP and a zero/invalid target
+also stop both motors. Verify directions, encoder readings, gains, and stopping on
+the robot; software tests cannot establish physical speed matching.
+
 - `subsystems/`: `Intake`, `Transfer`, `Shooter`, `Drivetrain`, `Turret`, and `Limelight`.
   Each exposes an `INSTANCE`, a private constructor, and named command fields or methods.
 - `opmodes/`: TeleOps and autos. Autos declare poses and path fields, construct the
@@ -168,12 +197,12 @@ Motor power is clamped to [0, 1], and invalid inputs stop output.
 The software gains `Shooter.DEFAULT_P/I/D/F` start at zero and need physical tuning.
 Do not copy REV Hub PIDF coefficients into this software loop.
 
-1. Select `Velocity Tuning`. Edit its p/i/d/f, targetVelocity, and runTransfer in Panels.
+1. Select `Velocity Tuning`. Edit its p/i/d/f, targetVelocity, and runIntake in Panels.
 2. Set `targetVelocity` in encoder ticks/second; zero stops the shooter. Changes apply
    each loop. `f` is velocity feedforward, measured in power per tick/second.
-3. Enable `runTransfer` to run intake at -0.7 and open the transfer blocker.
-   False closes the blocker and stops intake. It resets to false at INIT, PLAY,
-   and STOP. Calibrate the blocker positions before feeding.
+3. Enable `runIntake` to run intake at -0.7; disable it to stop. `runTransfer`
+   currently has no hardware effect because the transfer blocker is disabled.
+   `runIntake` resets to false at INIT, PLAY, and STOP.
 4. Graph target/measured velocity in Panels. Displayed RPM assumes 28 ticks/revolution;
    confirm this for the installed shooter motor.
 5. Copy the tuned gains into `Shooter.DEFAULT_P/I/D/F` and rebuild. Panels edits do not

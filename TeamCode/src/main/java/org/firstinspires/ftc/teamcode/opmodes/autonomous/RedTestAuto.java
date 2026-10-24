@@ -18,9 +18,10 @@ import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
-import org.firstinspires.ftc.teamcode.subsystems.Transfer;
+// import org.firstinspires.ftc.teamcode.subsystems.Transfer;
 
-@NextAutonomous(name = "red hive+intake", group = "Pedro")
+// Temporarily hidden while non-drive hardware is disabled.
+// @NextAutonomous(name = "red hive+intake", group = "Pedro")
 public class RedTestAuto extends NextOpMode {
     private final Robot robot;
     private final Follower follower;
@@ -63,9 +64,9 @@ public class RedTestAuto extends NextOpMode {
                 Shooter.INSTANCE.runFlywheel,
                 Commands.waitMs(500),
                 Intake.INSTANCE.runIntake,
-                Transfer.INSTANCE.openBlocker,
+                // Transfer.INSTANCE.openBlocker,
                 Commands.waitMs(5000),
-                Transfer.INSTANCE.closeBlocker,
+                // Transfer.INSTANCE.closeBlocker,
                 followPath(goToIntakeCorner, "Go to Intake Corner"),
                 followPath(intakeCorner, "Intake Corner"),
                 followPath(runToPark, "Run to Park"),
