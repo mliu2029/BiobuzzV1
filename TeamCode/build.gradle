@@ -5,6 +5,7 @@ buildscript {
         maven {
             url 'https://repo.dairy.foundation/releases'
         }
+        maven { url = 'https://jitpack.io' }
     }
     dependencies {
         classpath 'dev.frozenmilk:Load:0.3.2'
@@ -47,8 +48,12 @@ repositories {
 dependencies {
     implementation project(':FtcRobotController')
     implementation 'com.pedropathing:revhub:3.0.2'
+    implementation 'com.skeletonarmyftc.marrow:core:1.2.2'
     implementation 'com.pedropathing:tuning:1.0.1'
     implementation 'com.pedropathing.ivy:pedro:1.1.1'
     implementation 'com.bylazar:fullpanels:1.0.18'
     testImplementation 'junit:junit:4.13.2'
+    implementation 'dev.ftcautotune.FtcAutoTune:pidautotuner-core:v1.4.3'
+    implementation 'dev.ftcautotune.FtcAutoTune:pidautotuner-ftc:v1.4.3'
+
 }

@@ -23,6 +23,8 @@
 package org.firstinspires.ftc.teamcode.opmodes;
 
 import com.pedropathing.ivy.Command;
+import com.skeletonarmy.marrow.weaver.PathConfig;
+import com.skeletonarmy.marrow.weaver.Weaver;
 
 import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
@@ -37,6 +39,7 @@ import dev.nextftc.robot.triggers.CommandGamepad;
 import dev.nextftc.robot.triggers.Trigger;
 
 public abstract class TeleOp extends NextOpMode {
+
     private static final int VELOCITY_STEP = 25;
     protected final Robot robot;
     private final Command driveCommand;
@@ -74,6 +77,10 @@ public abstract class TeleOp extends NextOpMode {
         Drivetrain.INSTANCE.getFollower().setPose(OpModeStorage.autonomousEndPose);
         Drivetrain.INSTANCE.getFollower().update();
         driveCommand.schedule();
+        Weaver.setConfig(new PathConfig()
+                .intakeWidth(8.0)
+                .robotWidth(16.0)
+                .robotHeight(16.0));
     }
 
     @Override
