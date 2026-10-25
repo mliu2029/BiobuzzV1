@@ -38,7 +38,7 @@ public class Robot implements NextRobot {
 
     public void initialize(HardwareMap hardwareMap) {
         drivetrain.initialize(hardwareMap);
-        shooter.initialize(hardwareMap);
+        shooter.initialize();
         intake.stopImmediately();
         turret.stopImmediately();
         limelight.stopImmediately();

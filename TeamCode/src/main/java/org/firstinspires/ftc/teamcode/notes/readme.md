@@ -20,14 +20,19 @@ zero. In `Velocity Tuning`, `runIntake` runs the intake at -0.7 when true
 and stops it when false; the transfer blocker remains disabled.
 
 Configure two matching shooter motors and connect both encoders, named `flywheel`
-and `rollers` in the Robot Controller hardware configuration. Both use
-`RUN_WITHOUT_ENCODER` with NextMotor velocity control and its default encoder scale (1 radian per
+and `rollers` in the Robot Controller hardware configuration. Both rely on the
+SDK's initial `RUN_WITHOUT_ENCODER` mode with NextMotor velocity control and its default encoder scale (1 radian per
 encoder tick). Setpoints and velocity telemetry use radians/second at that scale;
 these are not calibrated shaft radians/second. The custom tick unit and explicit
 angle-per-count/cache settings have been removed.
-`Shooter.periodic()` validates the readings and sends both velocity setpoints.
+Shooter commands set both velocity targets directly; NextMotor maintains them until
+another command changes the target or stops the motors.
 NextFTC's motor hook runs each NextMotor's PID and feedforward controller using
 plain named motors: `new NextMotor("flywheel")` and `new NextMotor("rollers")`.
+Shooter uses only NextMotor references for direction, feedback, and stopping.
+STOP sets zero throttle and updates both motors immediately. It uses NextMotor's
+default 0.01 power cache tolerance, which can suppress a zero write when the cached
+output is already within that tolerance of zero.
 Motor output follows standard SDK signed power limits (-1 to 1); the custom output
 adapter has been removed. The target and gains keep their
 existing numeric values because the default encoder feedback has the same numeric
@@ -36,7 +41,7 @@ NextMotor's velocity feedforward kV; kS and kA remain zero.
 They share one target velocity and one set of P/I/D/F gains. Each motor has its own
 PID controller and encoder feedback so a slower motor receives its own correction.
 The `flywheel` direction is `REVERSE` and `rollers` is `FORWARD`, as configured in
-`Shooter.initializeMotors()`. Confirm each measured velocity is positive in the
+`Shooter.initialize()`. Confirm each measured velocity is positive in the
 intended shooting direction.
 
 Controller 1 D-pad up starts both motors; down stops both. Right/left changes their
@@ -45,10 +50,13 @@ shared target by 25 rad/s. `Velocity Tuning` exposes shared P/I/D/F and
 because the default encoder scale does not represent calibrated shaft rotation.
 The initial target is 1375 rad/s; the current default gains are in
 `mechanisms/Shooter.java` and still need validation on the robot.
-Use `getVelocity1/2()` and `getPower1/2()` to inspect each motor. Autonomous
+Use `getFlywheelVelocity()` / `getRollerVelocity()` and `getFlywheelPower()` /
+`getRollerPower()` to inspect each motor. Power telemetry reports NextMotor's cached
+output command clipped to the SDK's [-1, 1] range. Autonomous
 shooting uses the existing timed sequence; there is no readiness-gating API.
-Invalid encoder readings or gains stop both outputs. STOP and a zero/invalid target
-also stop both motors. Verify directions, encoder readings, gains, and stopping on
+Invalid gains, STOP, and a zero/invalid target stop both motors. There is no separate
+encoder-fault monitor. Adjusting the saved target while stopped keeps the motors
+stopped. Verify directions, encoder readings, gains, and stopping on
 the robot; software tests cannot establish physical speed matching.
 
 - `mechanisms/`: `Intake`, `Transfer`, `Shooter`, `Drivetrain`, `Turret`, and `Limelight`.
@@ -77,8 +85,8 @@ These are the equivalents of DecodeV3's constructor, `onInit()`,
 `onStartButtonPressed()`, `onUpdate()`, and `onStop()` patterns. Do not mix in
 DecodeV3's older `NextFTCOpMode`, `SubsystemComponent`, or `CommandManager` imports.
 
-Shooter setpoints are updated in its `periodic()` method; NextFTC's motor hook
-runs both NextMotor velocity controllers. The turret PID loop runs in its own
+Shooter commands update the setpoints; NextFTC's motor hook runs both NextMotor
+velocity controllers each loop. Shooter needs no `periodic()` method. The turret PID loop runs in its own
 `periodic()` method.
 Controller bindings live in `opmodes/teleop/TeleOp` and `BioBuzzTurretTeleop`.
 Hardware is looked up during OpMode initialization, not while classes are scanned.
@@ -222,8 +230,8 @@ both SDK motors in `RUN_WITHOUT_ENCODER`. NextMotor owns each velocity controlle
 and its gains; Shooter does not keep a second copy of those gains. Targets and
 feedback use rad/s with NextMotor's default 1-radian-per-tick scale. The default
 target is 1375.
-Motor power uses the SDK's [-1, 1] limits; invalid targets, gains, or encoder
-readings stop output.
+Motor power uses the SDK's [-1, 1] limits; zero/invalid targets and invalid gains
+stop output. Encoder feedback goes directly to NextMotor without a separate fault monitor.
 
 The software gains are the current `Shooter.DEFAULT_P/I/D/F` values and need
 validation on the robot.

@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.opmodes.calib;
+package org.firstinspires.ftc.teamcode.opmodes.tests;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;
@@ -55,10 +55,10 @@ public class VelocityPidTuning extends NextOpMode {
         robot.getShooter().setVelocity(targetVelocity);
         panelsTelemetry.addData("Target Velocity (rad/s)", robot.getShooter().isEnabled()
                 ? robot.getShooter().getTargetVelocity() : 0.0);
-        panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.getShooter().getVelocity1());
-        panelsTelemetry.addData("Flywheel2 Velocity (rad/s)", robot.getShooter().getVelocity2());
-        panelsTelemetry.addData("Flywheel Power", robot.getShooter().getPower1());
-        panelsTelemetry.addData("Flywheel2 Power", robot.getShooter().getPower2());
+        panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.getShooter().getFlywheelVelocity());
+        panelsTelemetry.addData("Flywheel2 Velocity (rad/s)", robot.getShooter().getRollerVelocity());
+        panelsTelemetry.addData("Flywheel Power", robot.getShooter().getFlywheelPower());
+        panelsTelemetry.addData("Flywheel2 Power", robot.getShooter().getRollerPower());
         panelsTelemetry.addLine(String.format(Locale.US,
                 "PIDF | P: %.5f, I: %.5f, D: %.5f, F: %.5f", p, i, d, f));
         panelsTelemetry.update(telemetry);
