@@ -1,16 +1,16 @@
-package org.firstinspires.ftc.teamcode.subsystems;
+package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.ivy.Command;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 
 public class Intake implements Mechanism {
-    public static final Intake INSTANCE = new Intake();
     private final NextMotor intake = new NextMotor("intake");
 
-    private Intake() {
+    public Intake() {
         intake.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         intake.setDirection(NextMotor.Direction.REVERSE);
+        // TODO: i have no fucking clue which direction this is supposed to be
     }
 
     public final Command runIntake = setPower(1.0);

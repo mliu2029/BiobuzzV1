@@ -1,45 +1,70 @@
 # BioBuzz robot code
 
-The structure follows DecodeV3, adapted to NextFTC v2 0.2.1 and Pedro 3.
+The structure follows Hazmat: a Robot owns the mechanisms, OpModes select commands,
+and autonomous geometry is separate from routines. Driving uses Pedro 3 with
+NextFTC v2 0.2.1 and Ivy commands.
 
 ## Current hardware and dual-motor shooter
 
-`Robot` currently registers the drivetrain, intake, and shooter. Transfer, turret,
-and camera initialization remain disabled; their controls below describe the full
-robot configuration. The intake motor's hardware name is `intake`. Controller 1
+`Robot` currently registers the drivetrain, intake, shooter, turret, and camera.
+Select `red turret teleop` or `blue turret teleop` to initialize the `turret` motor
+and optional `limelight` camera for that alliance. Point the turret physically
+forward before INIT, which resets its encoder. Aiming starts at PLAY; controller 2
+Circle stops it and D-pad up resumes it. Set measured travel limits and tuned gains
+in `TurretConfig` before expecting motion; the current zero limits report
+`CALIBRATION REQUIRED`, and vision correction remains off by default.
+Transfer hardware and its controls remain disabled.
+The intake motor's hardware name is `intake`. Controller 1
 Circle starts it at +1 and Square reverses it at -1; INIT and STOP set its power to
 zero. In `Velocity Tuning`, `runIntake` runs the intake at -0.7 when true
 and stops it when false; the transfer blocker remains disabled.
 
 Configure two matching shooter motors and connect both encoders, named `flywheel`
-and `flywheel2` in the Robot Controller hardware configuration. Both use
-`RUN_WITHOUT_ENCODER` with software velocity PID in raw encoder ticks/second.
+and `rollers` in the Robot Controller hardware configuration. Both use
+`RUN_WITHOUT_ENCODER` with NextMotor velocity control and its default encoder scale (1 radian per
+encoder tick). Setpoints and velocity telemetry use radians/second at that scale;
+these are not calibrated shaft radians/second. The custom tick unit and explicit
+angle-per-count/cache settings have been removed.
+`Shooter.periodic()` validates the readings and sends both velocity setpoints.
+NextFTC's motor hook runs each NextMotor's PID and feedforward controller using
+plain named motors: `new NextMotor("flywheel")` and `new NextMotor("rollers")`.
+Motor output follows standard SDK signed power limits (-1 to 1); the custom output
+adapter has been removed. The target and gains keep their
+existing numeric values because the default encoder feedback has the same numeric
+scale as the previous tick-based controller. The existing F gain maps to
+NextMotor's velocity feedforward kV; kS and kA remain zero.
 They share one target velocity and one set of P/I/D/F gains. Each motor has its own
 PID controller and encoder feedback so a slower motor receives its own correction.
-Both directions currently default to `FORWARD`; if the mounting requires one motor
-to rotate oppositely, change that motor's direction in `Shooter.initializeMotors()`
-and confirm its measured velocity is positive in the intended shooting direction.
+The `flywheel` direction is `REVERSE` and `rollers` is `FORWARD`, as configured in
+`Shooter.initializeMotors()`. Confirm each measured velocity is positive in the
+intended shooting direction.
 
 Controller 1 D-pad up starts both motors; down stops both. Right/left changes their
-shared target by 25 ticks/s. `Velocity Tuning` exposes shared P/I/D/F and
-`targetVelocity` in Panels and reports each motor's speed and power separately.
-The initial target is 1375 ticks/s; gains default to zero and need hardware tuning.
-`Shooter.isReady()` requires both motors to reach at least target minus 100 ticks/s.
-The older `getVelocity()` and `getPower()` methods now return the mean of both
-motors; use `getVelocity1/2()` and `getPower1/2()` to inspect them individually.
+shared target by 25 rad/s. `Velocity Tuning` exposes shared P/I/D/F and
+`targetVelocity` in Panels and reports each motor's speed and power separately. RPM estimates have been removed
+because the default encoder scale does not represent calibrated shaft rotation.
+The initial target is 1375 rad/s; the current default gains are in
+`mechanisms/Shooter.java` and still need validation on the robot.
+Use `getVelocity1/2()` and `getPower1/2()` to inspect each motor. Autonomous
+shooting uses the existing timed sequence; there is no readiness-gating API.
 Invalid encoder readings or gains stop both outputs. STOP and a zero/invalid target
 also stop both motors. Verify directions, encoder readings, gains, and stopping on
 the robot; software tests cannot establish physical speed matching.
 
-- `subsystems/`: `Intake`, `Transfer`, `Shooter`, `Drivetrain`, `Turret`, and `Limelight`.
-  Each exposes an `INSTANCE`, a private constructor, and named command fields or methods.
-- `opmodes/`: TeleOps and autos. Autos declare poses and path fields, construct the
-  paths in `buildPaths()`, and schedule the command sequence returned by `auto()`.
-- `util/Calculations`: turret targets, alliance selection, and aiming math.
-- `util/TurretConfig`: live turret calibration and PID settings in Panels.
-- `tests/VelocityPidTuning`: the Panels shooter tuner, registered as `Velocity Tuning`.
-- `Robot`: registers the subsystem instances with NextFTC and initializes/stops hardware.
-- `util/OpModeStorage`: the autonomous end pose, defaulting to `(0, 0, 0)`.
+- `mechanisms/`: `Intake`, `Transfer`, `Shooter`, `Drivetrain`, `Turret`, and `Limelight`.
+  Each is constructed by `robot/Robot` and exposes named command fields or methods.
+  OpModes use getters such as `robot.getShooter()`; mechanisms are not static singletons.
+- `opmodes/teleop/`: selectable TeleOps and their shared base classes.
+- `opmodes/calib/`: calibration and tuning OpModes.
+- `opmodes/auto/paths/`: autonomous poses and path construction.
+- `opmodes/auto/commands/`: reusable actions in `AutoCommands` and sequences in `Routines`.
+- `opmodes/auto/runnables/`: autonomous OpMode initialization, scheduling, and telemetry.
+- `data/`: alliance/target enums, turret configuration, and saved OpMode pose.
+- `util/Calculations`: aiming math; target and alliance enums live in `data/`.
+- `data/TurretConfig`: live turret calibration and PID settings in Panels.
+- `opmodes/calib/VelocityPidTuning`: the Panels shooter tuner, registered as `Velocity Tuning`.
+- `robot/Robot`: constructs mechanisms, registers them with NextFTC, and initializes/stops hardware.
+- `data/OpModeStorage`: the autonomous end pose, defaulting to `(0, 0, 0)`.
 
 ## Framework lifecycle
 
@@ -52,8 +77,10 @@ These are the equivalents of DecodeV3's constructor, `onInit()`,
 `onStartButtonPressed()`, `onUpdate()`, and `onStop()` patterns. Do not mix in
 DecodeV3's older `NextFTCOpMode`, `SubsystemComponent`, or `CommandManager` imports.
 
-Shooter and turret PID loops run in their subsystems' `periodic()` methods.
-Controller bindings live in `opmodes/TeleOp` and `BioBuzzTurretTeleop`.
+Shooter setpoints are updated in its `periodic()` method; NextFTC's motor hook
+runs both NextMotor velocity controllers. The turret PID loop runs in its own
+`periodic()` method.
+Controller bindings live in `opmodes/teleop/TeleOp` and `BioBuzzTurretTeleop`.
 Hardware is looked up during OpMode initialization, not while classes are scanned.
 Every initialization stops outputs and resets the shooter control state. Turret
 hardware and camera initialization are opt-in through the turret TeleOps.
@@ -61,54 +88,55 @@ hardware and camera initialization are opt-in through the turret TeleOps.
 ## Subsystem commands
 
 ```java
-Intake.INSTANCE.runIntake.schedule();
-Intake.INSTANCE.runIntakeReverse.schedule();
-Intake.INSTANCE.stopIntake.schedule();
-Shooter.INSTANCE.runFlywheel.schedule(); // Uses the current target velocity.
-Shooter.INSTANCE.runFlywheel(1375).schedule();
-Shooter.INSTANCE.stopFlywheel.schedule();
-Transfer.INSTANCE.openBlocker.schedule();
-Transfer.INSTANCE.closeBlocker.schedule();
-Turret.INSTANCE.aimTurret.schedule(); // Initialize the turret with an alliance first.
-Turret.INSTANCE.stopTurret.schedule();
+robot.getIntake().runIntake.schedule();
+robot.getIntake().runIntakeReverse.schedule();
+robot.getIntake().stopIntake.schedule();
+robot.getShooter().runFlywheel.schedule(); // Uses the current target velocity.
+robot.getShooter().stopFlywheel.schedule();
+robot.getTransfer().openBlocker.schedule();
+robot.getTransfer().closeBlocker.schedule();
+robot.getTurret().aimTurret.schedule(); // Initialize the turret with an alliance first.
+robot.getTurret().stopTurret.schedule();
 ```
 
 Creating a command does not execute it; schedule it or include it in a group.
 The instantaneous commands leave their output/setpoint active until another command
-changes it. Each command owns its subsystem. Driving reads joystick suppliers
-continuously and stops when interrupted. TeleOp bindings close the blocker when
-both L1 and R1 are released.
+changes it. Each command owns its mechanism. TeleOp starts driving with
+`robot.startDrive(gamepad1)`; the drivetrain continuously reads the sticks, calls
+Pedro `follower.manual(...)`, and updates localization. It stops when interrupted.
+Transfer controls remain disabled.
 
 Transfer is a positional servo blocker with hardware name `transfer`. Set
 `Transfer.OPEN_POSITION` and `Transfer.BLOCKED_POSITION` in Panels (range 0 to 1).
 Both default to 0.5 as uncalibrated placeholders, so opening and closing currently
 command the same position. INIT and STOP command the blocked position. Copy the
-calibrated values into `subsystems/Transfer.java` to keep them after a restart.
+calibrated values into `mechanisms/Transfer.java` to keep them after a restart.
 
 ## Autonomous format
 
-See `opmodes/autonomous/RedTestAuto`, `RedTestReturnToShootAuto`, and `RedShootAndParkAuto`.
+See the OpModes in `opmodes/auto/runnables/`. Each selects a method from
+`opmodes/auto/commands/Routines`; its geometry lives in `opmodes/auto/paths/`.
+The autonomous registration annotations remain disabled.
 They preserve the existing poses, curve controls, heading interpolation, path order,
 500 ms shooter wait, and 5000 ms feed period. The intake continues through the paths,
-while the blocker closes after feeding. The existing `red shoot twice` sequence
+while transfer hardware remains disabled. The existing `red shoot twice` sequence
 still has its single opening feed period; this reorganization does not add a shot.
 
-A sequence uses the same command logic as DecodeV3 with Ivy's group functions:
+A routine composes shared actions and paths:
 
 ```java
-private Command auto() {
+public Command shootAndPark(ShootAndParkPaths paths) {
     return sequential(
-            Shooter.INSTANCE.runFlywheel,
-            Commands.waitMs(500),
-            Intake.INSTANCE.runIntake,
-            Transfer.INSTANCE.openBlocker,
-            Commands.waitMs(5000),
-            Transfer.INSTANCE.closeBlocker,
-            Drivetrain.INSTANCE.followPath(runToPark),
-            robot.stop()
+            commands.shootPreload(),
+            commands.followPath(paths.runToPark, "Run to Park"),
+            commands.finish()
     );
 }
 ```
+
+`AutoCommands` receives the same Robot that NextFTC injected into the OpMode.
+Its preload action starts the shooter, waits 500 ms, starts the intake, and waits
+5000 ms. Transfer remains disabled. No helper constructs another Robot.
 
 Autos update the follower once per loop. NextFTC handles the scheduler, software
 shooter PID, and motor event loop. `end()` saves `follower.pose()` into
@@ -125,7 +153,7 @@ The saved pose lasts until the Robot Controller process restarts.
 | 1 | Circle | Start intake at +1 |
 | 1 | Square | Reverse intake at -1 |
 | 1 | D-pad up / down | Enable / stop shooter; down takes priority |
-| 1 | D-pad right / left | Increase / decrease shooter target velocity by 25 ticks/s |
+| 1 | D-pad right / left | Increase / decrease shooter target velocity by 25 rad/s |
 | 1 | R1 (hold) | Open transfer blocker; release to close |
 | 1 | L1 (hold) | Close transfer blocker; L1 takes priority |
 | 2, turret TeleOps | Circle | Stop turret aiming |
@@ -155,7 +183,7 @@ double angleDegrees = Math.toDegrees(
 
 Zero degrees is robot forward; positive angles turn counterclockwise. The code
 wraps the angle and selects an equivalent angle inside the configured rotation
-limits. `subsystems/Turret.periodic()` runs PID to reach and hold that angle,
+limits. `mechanisms/Turret.periodic()` runs PID to reach and hold that angle,
 including errors inside the alignment tolerance.
 
 The selected alliance determines the hive. Pedro Y below `halfwayY` selects close;
@@ -177,7 +205,7 @@ Before using the turret:
 
 1. Place it physically forward before INIT. Initialization resets its encoder to zero.
 2. Set signed `ticksPerDegree` and measured `minDegrees` / `maxDegrees` in
-   `util/TurretConfig`. The current scale is 1.51146 and needs physical verification;
+   `data/TurretConfig`. The current scale is 1.51146 and needs physical verification;
    both limits default to zero, preventing movement until calibrated.
 3. Tune `p/i/d` and `staticPower`, starting with the 0.25 power cap. Gains default to
    zero. `toleranceDegrees` controls the aligned indicator; PID stays active within it.
@@ -189,22 +217,26 @@ Close/far selection follows robot position. Hive tipping is not detected. See
 
 ## Shooter tuning
 
-Shooter uses NextFTC `PIDController` and `SimpleFeedforward`, with the SDK motor
-in `RUN_WITHOUT_ENCODER`. The hardware name is `launcher`. Targets and feedback are
-encoder ticks/second; the default target is 1375, with readiness at target minus 100.
-Motor power is clamped to [0, 1], and invalid inputs stop output.
+Shooter uses two plain NextMotor instances for `flywheel` and `rollers`, with
+both SDK motors in `RUN_WITHOUT_ENCODER`. NextMotor owns each velocity controller
+and its gains; Shooter does not keep a second copy of those gains. Targets and
+feedback use rad/s with NextMotor's default 1-radian-per-tick scale. The default
+target is 1375.
+Motor power uses the SDK's [-1, 1] limits; invalid targets, gains, or encoder
+readings stop output.
 
-The software gains `Shooter.DEFAULT_P/I/D/F` start at zero and need physical tuning.
+The software gains are the current `Shooter.DEFAULT_P/I/D/F` values and need
+validation on the robot.
 Do not copy REV Hub PIDF coefficients into this software loop.
 
 1. Select `Velocity Tuning`. Edit its p/i/d/f, targetVelocity, and runIntake in Panels.
-2. Set `targetVelocity` in encoder ticks/second; zero stops the shooter. Changes apply
-   each loop. `f` is velocity feedforward, measured in power per tick/second.
+2. Set `targetVelocity` in encoder rad/s; zero stops the shooter. Changes apply
+   each loop. `f` is velocity feedforward, measured in power per rad/s at the default encoder scale.
 3. Enable `runIntake` to run intake at -0.7; disable it to stop. `runTransfer`
    currently has no hardware effect because the transfer blocker is disabled.
    `runIntake` resets to false at INIT, PLAY, and STOP.
-4. Graph target/measured velocity in Panels. Displayed RPM assumes 28 ticks/revolution;
-   confirm this for the installed shooter motor.
+4. Graph target/measured velocity and each motor's power in Panels. The default
+   encoder scale does not give calibrated shaft RPM.
 5. Copy the tuned gains into `Shooter.DEFAULT_P/I/D/F` and rebuild. Panels edits do not
    automatically update source files.
 

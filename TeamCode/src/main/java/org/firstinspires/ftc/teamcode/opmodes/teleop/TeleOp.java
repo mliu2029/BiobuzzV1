@@ -20,17 +20,12 @@
  *   SOFTWARE.
  */
 
-package org.firstinspires.ftc.teamcode.opmodes;
+package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
-import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
 
-import org.firstinspires.ftc.teamcode.util.OpModeStorage;
-import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
-import org.firstinspires.ftc.teamcode.subsystems.Intake;
-import org.firstinspires.ftc.teamcode.subsystems.Shooter;
-// import org.firstinspires.ftc.teamcode.subsystems.Transfer;
+import org.firstinspires.ftc.teamcode.data.OpModeStorage;
+import org.firstinspires.ftc.teamcode.robot.Robot;
 
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
@@ -39,7 +34,6 @@ import dev.nextftc.robot.triggers.CommandGamepad;
 public abstract class TeleOp extends NextOpMode {
     private static final int VELOCITY_STEP = 25;
     protected final Robot robot;
-    private final Command driveCommand;
 
     protected TeleOp(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
@@ -47,22 +41,18 @@ public abstract class TeleOp extends NextOpMode {
         robot.initialize(hardwareMap);
 
         CommandGamepad driver = new CommandGamepad(gamepad1);
-        driveCommand = Drivetrain.INSTANCE.drive(
-                () -> -gamepad1.right_stick_y,
-                () -> gamepad1.right_stick_x,
-                () -> gamepad1.left_stick_x);
 
-        driver.circle().onTrue(Intake.INSTANCE.runIntake);
-        driver.square().onTrue(Intake.INSTANCE.runIntakeReverse);
-        driver.dpadUp().and(driver.dpadDown().negate()).onTrue(Shooter.INSTANCE.runFlywheel);
-        driver.dpadDown().onTrue(Shooter.INSTANCE.stopFlywheel);
-        driver.dpadRight().onTrue(Shooter.INSTANCE.instant(
-                () -> Shooter.INSTANCE.adjustVelocity(VELOCITY_STEP)));
-        driver.dpadLeft().onTrue(Shooter.INSTANCE.instant(
-                () -> Shooter.INSTANCE.adjustVelocity(-VELOCITY_STEP)));
+        driver.circle().onTrue(robot.getIntake().runIntake);
+        driver.square().onTrue(robot.getIntake().runIntakeReverse);
+        driver.dpadUp().and(driver.dpadDown().negate()).onTrue(robot.getShooter().runFlywheel);
+        driver.dpadDown().onTrue(robot.getShooter().stopFlywheel);
+        driver.dpadRight().onTrue(robot.getShooter().instant(
+                () -> robot.getShooter().adjustVelocity(VELOCITY_STEP)));
+        driver.dpadLeft().onTrue(robot.getShooter().instant(
+                () -> robot.getShooter().adjustVelocity(-VELOCITY_STEP)));
 
-        // driver.rightBumper().onTrue(Transfer.INSTANCE.openBlocker);
-        // driver.rightBumper().onFalse(Transfer.INSTANCE.closeBlocker);
+        // driver.rightBumper().onTrue(robot.getTransfer().openBlocker);
+        // driver.rightBumper().onFalse(robot.getTransfer().closeBlocker);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -71,18 +61,18 @@ public abstract class TeleOp extends NextOpMode {
     @Override
     public void start() {
         Pose startingPose = OpModeStorage.autonomousEndPose;
-        Drivetrain.INSTANCE.getFollower().setPose(
+        robot.getDrivetrain().getFollower().setPose(
                 startingPose != null ? startingPose : Pose.zero());
-        Drivetrain.INSTANCE.getFollower().update();
-        driveCommand.schedule();
+        robot.getDrivetrain().getFollower().update();
+        robot.startDrive(gamepad1);
     }
 
     @Override
     public void periodic() {
-        telemetry.addData("Shooter target (ticks/s)", Shooter.INSTANCE.getTargetVelocity());
-        telemetry.addData("Flywheel velocity (ticks/s)", Shooter.INSTANCE.getVelocity1());
-        telemetry.addData("Flywheel2 velocity (ticks/s)", Shooter.INSTANCE.getVelocity2());
-        telemetry.addData("Pose", Drivetrain.INSTANCE.getFollower().pose());
+        telemetry.addData("Shooter target (rad/s)", robot.getShooter().getTargetVelocity());
+        telemetry.addData("Flywheel velocity (rad/s)", robot.getShooter().getVelocity1());
+        telemetry.addData("Flywheel2 velocity (rad/s)", robot.getShooter().getVelocity2());
+        telemetry.addData("Pose", robot.getDrivetrain().getFollower().pose());
         telemetry.update();
     }
 

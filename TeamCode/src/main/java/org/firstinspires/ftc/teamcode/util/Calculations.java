@@ -1,45 +1,10 @@
 package org.firstinspires.ftc.teamcode.util;
 
+import org.firstinspires.ftc.teamcode.data.HiveTarget;
+
 public final class Calculations {
     private Calculations() { }
 
-    public enum HiveTarget {
-        RED_CLOSE(58, 59, 34), BLUE_CLOSE(84, 59, 38),
-        RED_FAR(58, 85, 30), BLUE_FAR(84, 85, 42);
-
-        public final double x;
-        public final double y;
-        public final int firstTagId;
-
-        HiveTarget(double x, double y, int firstTagId) {
-            this.x = x;
-            this.y = y;
-            this.firstTagId = firstTagId;
-        }
-
-        public boolean acceptsTag(int id) {
-            return id >= firstTagId && id < firstTagId + 4;
-        }
-    }
-
-    public enum Alliance {
-        RED(HiveTarget.RED_CLOSE, HiveTarget.RED_FAR),
-        BLUE(HiveTarget.BLUE_CLOSE, HiveTarget.BLUE_FAR);
-
-        public final HiveTarget close;
-        public final HiveTarget far;
-
-        Alliance(HiveTarget close, HiveTarget far) {
-            this.close = close;
-            this.far = far;
-        }
-
-        public HiveTarget targetForY(double y, double halfwayY) {
-            if (!Double.isFinite(y) || !Double.isFinite(halfwayY)) return null;
-            return y < halfwayY ? close : far;
-        }
-
-    }
 // calculation for turret
     public static double bearing(double x, double y, double headingRadians, HiveTarget target) {
         if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(headingRadians)) {

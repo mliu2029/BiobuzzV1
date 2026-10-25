@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.subsystems;
+package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
@@ -6,8 +6,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import dev.nextftc.robot.Mechanism;
 
 public class Limelight implements Mechanism {
-    public static final Limelight INSTANCE = new Limelight();
-    private Limelight() { }
+    public Limelight() { }
 
     private Limelight3A camera;
     private int appliedPipeline = -1;
