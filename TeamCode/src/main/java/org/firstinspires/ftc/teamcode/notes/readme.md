@@ -2,7 +2,7 @@
 
 The structure follows DecodeV3, adapted to NextFTC v2 0.2.1 and Pedro 3.
 
-## Current hardware and dual-motor shooter
+## Current hardware and shooter
 
 `Robot` currently registers the drivetrain, intake, and shooter. Transfer, turret,
 and camera initialization remain disabled; their controls below describe the full
@@ -11,25 +11,18 @@ Circle starts it at +1 and Square reverses it at -1; INIT and STOP set its power
 zero. In `Velocity Tuning`, `runIntake` runs the intake at -0.7 when true
 and stops it when false; the transfer blocker remains disabled.
 
-Configure two matching shooter motors and connect both encoders, named `flywheel`
-and `flywheel2` in the Robot Controller hardware configuration. Both use
-`RUN_WITHOUT_ENCODER` with software velocity PID in raw encoder ticks/second.
-They share one target velocity and one set of P/I/D/F gains. Each motor has its own
-PID controller and encoder feedback so a slower motor receives its own correction.
-Both directions currently default to `FORWARD`; if the mounting requires one motor
-to rotate oppositely, change that motor's direction in `Shooter.initializeMotors()`
-and confirm its measured velocity is positive in the intended shooting direction.
+Configure one shooter motor named `flywheel`, with its encoder connected, and a
+second motor named `rollers` in the Robot Controller hardware configuration. The
+flywheel uses `RUN_WITHOUT_ENCODER` with software velocity PID in raw encoder
+ticks/second and defaults to `REVERSE`; if needed, change its direction in
+`Shooter.initializeMotors()` and confirm its measured velocity is positive in the
+shooting direction. The rollers are initialized at zero power but not controlled yet.
 
-Controller 1 D-pad up starts both motors; down stops both. Right/left changes their
-shared target by 25 ticks/s. `Velocity Tuning` exposes shared P/I/D/F and
-`targetVelocity` in Panels and reports each motor's speed and power separately.
-The initial target is 1375 ticks/s; gains default to zero and need hardware tuning.
-`Shooter.isReady()` requires both motors to reach at least target minus 100 ticks/s.
-The older `getVelocity()` and `getPower()` methods now return the mean of both
-motors; use `getVelocity1/2()` and `getPower1/2()` to inspect them individually.
-Invalid encoder readings or gains stop both outputs. STOP and a zero/invalid target
-also stop both motors. Verify directions, encoder readings, gains, and stopping on
-the robot; software tests cannot establish physical speed matching.
+Controller 1 D-pad up starts the flywheel; down stops it. Right/left changes the
+target by 25 ticks/s. `Velocity Tuning` exposes P/I/D/F and `targetVelocity` in
+Panels and reports the flywheel's speed and power. The initial target is 1375 ticks/s.
+`Shooter.isReady()` requires the flywheel to reach at least target minus 100 ticks/s.
+Invalid encoder readings or gains, STOP, and a zero/invalid target stop the flywheel.
 
 - `subsystems/`: `Intake`, `Transfer`, `Shooter`, `Drivetrain`, `Turret`, and `Limelight`.
   Each exposes an `INSTANCE`, a private constructor, and named command fields or methods.
@@ -211,3 +204,27 @@ Do not copy REV Hub PIDF coefficients into this software loop.
 Panels is available on robot Wi-Fi at http://192.168.43.1:8001 on a Control Hub,
 or http://192.168.49.1:8001 on a phone RC. See [the turret tuning guide](TURRET_AIMING.md) for turret
 calibration, tag groups, and current aiming limitations.
+
+## Pollen tracking (webcam)
+
+`vision/PollenLocator` runs [Hive Vision](https://github.com/hivevisionftc/Hive-Vision)'s
+webcam HSV pipeline (`BallDetectorPipeline` / `BallBlobPipeline`, copied unchanged except
+for the package) and projects each ball onto the floor in Pedro field coordinates:
+
+```java
+PollenLocator pollen = new PollenLocator(hardwareMap);
+List<Pose> seen = pollen.getPollen(follower.pose());     // yellow pollen, field poses
+PathResult route = pollen.planPath(follower.pose());     // Marrow Weaver route, or null
+follower.follow(PedroPathingConverter.toPath(route));
+```
+
+`planPath` sends the visible pollen to Marrow's Weaver, which orders them and avoids the
+HIVE legs and any red/blue nectar it sees. Set the webcam name, mounting (forward/left
+offset, height, downward pitch, yaw), and field layout in `vision/PollenVisionConfig`
+(editable in Panels). The webcam is named `Webcam 1` by default.
+
+`Pollen Tracker Test` (Tuning group) shows each pollen's x/y. Cross follows a Weaver path
+through the visible pollen; Circle returns to manual driving. To check the camera mounting,
+place a pollen at a measured spot, drive until it is in view, and adjust `cameraPitch` and
+`cameraHeightIn` until the reported x/y matches. Positions use the pose at read time, so
+hold the robot still while reading them.

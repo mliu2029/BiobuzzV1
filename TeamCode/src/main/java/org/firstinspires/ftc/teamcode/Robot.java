@@ -16,7 +16,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Shooter;
 // import org.firstinspires.ftc.teamcode.subsystems.Transfer;
 // import org.firstinspires.ftc.teamcode.subsystems.Turret;
 
-/** Registers the drivetrain, intake, and dual-motor shooter. */
+/** Registers the drivetrain, intake, and shooter. */
 public class Robot implements NextRobot {
     private final Set<Mechanism> subsystems = Collections.unmodifiableSet(
             new LinkedHashSet<>(Arrays.asList(Drivetrain.INSTANCE, Intake.INSTANCE, Shooter.INSTANCE

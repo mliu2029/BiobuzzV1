@@ -80,8 +80,7 @@ public abstract class TeleOp extends NextOpMode {
     @Override
     public void periodic() {
         telemetry.addData("Shooter target (ticks/s)", Shooter.INSTANCE.getTargetVelocity());
-        telemetry.addData("Flywheel velocity (ticks/s)", Shooter.INSTANCE.getVelocity1());
-        telemetry.addData("Flywheel2 velocity (ticks/s)", Shooter.INSTANCE.getVelocity2());
+        telemetry.addData("Flywheel velocity (ticks/s)", Shooter.INSTANCE.getVelocity());
         telemetry.addData("Pose", Drivetrain.INSTANCE.getFollower().pose());
         telemetry.update();
     }

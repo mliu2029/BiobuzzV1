@@ -27,7 +27,7 @@ public class ShooterTuningConfig {
     // ---- Hardware ------------------------------------------------------
 
     /** Hardware-config name of the shooter motor (see mechanisms/Shooter.java). */
-    public static String MOTOR_NAME = "launcher";
+    public static String MOTOR_NAME = "flywheel";
 
     /** Set true if positive power spins the shooter so the encoder reads negative. */
     public static boolean REVERSED = false;

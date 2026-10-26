@@ -56,12 +56,9 @@ public class VelocityPidTuning extends NextOpMode {
         Shooter.INSTANCE.setVelocity(targetVelocity);
         panelsTelemetry.addData("Target Velocity (ticks/s)", Shooter.INSTANCE.isEnabled()
                 ? Shooter.INSTANCE.getTargetVelocity() : 0.0);
-        panelsTelemetry.addData("Flywheel Velocity (ticks/s)", Shooter.INSTANCE.getVelocity1());
-        panelsTelemetry.addData("Flywheel2 Velocity (ticks/s)", Shooter.INSTANCE.getVelocity2());
-        panelsTelemetry.addData("Flywheel RPM", Shooter.INSTANCE.getVelocity1() * 60.0 / TICKS_PER_REVOLUTION);
-        panelsTelemetry.addData("Flywheel2 RPM", Shooter.INSTANCE.getVelocity2() * 60.0 / TICKS_PER_REVOLUTION);
-        panelsTelemetry.addData("Flywheel Power", Shooter.INSTANCE.getPower1());
-        panelsTelemetry.addData("Flywheel2 Power", Shooter.INSTANCE.getPower2());
+        panelsTelemetry.addData("Flywheel Velocity (ticks/s)", Shooter.INSTANCE.getVelocity());
+        panelsTelemetry.addData("Flywheel RPM", Shooter.INSTANCE.getVelocity() * 60.0 / TICKS_PER_REVOLUTION);
+        panelsTelemetry.addData("Flywheel Power", Shooter.INSTANCE.getPower());
         panelsTelemetry.addLine(String.format(Locale.US,
                 "PIDF | P: %.5f, I: %.5f, D: %.5f, F: %.5f", p, i, d, f));
         panelsTelemetry.update(telemetry);
