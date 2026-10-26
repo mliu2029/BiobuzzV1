@@ -47,12 +47,12 @@ All paths below are relative to this guide:
 
 | File | Purpose |
 | --- | --- |
-| [util/TurretConfig.java](../util/TurretConfig.java) | Panels settings and source defaults |
+| [data/TurretConfig.java](../data/TurretConfig.java) | Panels settings and source defaults |
 | [util/Calculations.java](../util/Calculations.java) | Targets, alliance selection, angles, and vision acceptance |
-| [subsystems/Turret.java](../subsystems/Turret.java) | Encoder reset, continuous PID, and vision correction |
-| [subsystems/Limelight.java](../subsystems/Limelight.java) | Camera polling and pipeline selection |
-| [opmodes/BioBuzzTurretTeleop.java](../opmodes/BioBuzzTurretTeleop.java) | Turret controls and telemetry |
-| [util/OpModeStorage.java](../util/OpModeStorage.java) | Starting pose passed from autonomous |
+| [mechanisms/Turret.java](../mechanisms/Turret.java) | Encoder reset, continuous PID, and vision correction |
+| [mechanisms/Limelight.java](../mechanisms/Limelight.java) | Camera polling and pipeline selection |
+| [opmodes/teleop/BioBuzzTurretTeleop.java](../opmodes/teleop/BioBuzzTurretTeleop.java) | Turret controls and telemetry |
+| [data/OpModeStorage.java](../data/OpModeStorage.java) | Starting pose passed from autonomous |
 
 Select **`red turret teleop`** or **`blue turret teleop`** on the Driver Station.
 Aiming enables automatically at PLAY. Controller 2 **Circle** disables turret output;
@@ -209,7 +209,7 @@ restarts; moving the robot by hand between auto and TeleOp invalidates that pose
 See [Pedro's pose handoff guide](https://pedropathing.com/docs/pathing/guide/teleop-usage#passing-your-position-from-autonomous-to-teleop).
 
 For a stationary test without an auto, you can temporarily set the initial pose in
-`util/OpModeStorage.java` to a physically measured test pose, then deploy and restart
+`data/OpModeStorage.java` to a physically measured test pose, then deploy and restart
 the Robot Controller so an old static value cannot override the new initial value.
 There is no pose-setting control in `TurretConfig`. Restore the normal `(0, 0, 0)`
 fallback after testing and keep autonomous handoff enabled.
@@ -370,16 +370,16 @@ The current TeleOp does not display raw tx. If needed, temporarily add these imp
 to `BioBuzzTurretTeleop.java`:
 
 ```java
-import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import org.firstinspires.ftc.teamcode.subsystems.Limelight;
+
+
+
 ```
 
 Then add this diagnostic block inside `periodic()`, before `super.periodic()` sends
 telemetry. This is an optional example; it is not already installed by this guide.
 
 ```java
-LLResult result = Limelight.INSTANCE.getLatestResult();
+LLResult result = robot.getLimelight().getLatestResult();
 if (result != null) {
     telemetry.addData("LL valid", result.isValid());
     telemetry.addData("LL pipeline", result.getPipelineIndex());
@@ -488,7 +488,7 @@ becomes unacceptable instead of raising gains indefinitely.
 
 Record the tested motor/gearing, signed scale, measured limits, gains, cap, camera
 mount, pipeline, tag tx arrays, lighting, distances, and battery conditions. Copy the
-chosen values into `util/TurretConfig.java`, deploy, restart the Robot Controller,
+chosen values into `data/TurretConfig.java`, deploy, restart the Robot Controller,
 and confirm the values match the saved tune. Export a backup of the Limelight
 pipeline from its web interface as well.
 

@@ -1,7 +1,7 @@
-package org.firstinspires.ftc.teamcode.util;
+package org.firstinspires.ftc.teamcode.data;
 
 import com.bylazar.configurables.annotations.Configurable;
-import org.firstinspires.ftc.teamcode.util.Calculations.HiveTarget;
+import org.firstinspires.ftc.teamcode.data.HiveTarget;
 
 @Configurable
 public final class TurretConfig {

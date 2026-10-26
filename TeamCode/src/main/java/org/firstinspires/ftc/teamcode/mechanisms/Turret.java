@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.subsystems;
+package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
@@ -12,14 +12,20 @@ import dev.nextftc.control.feedback.PIDController;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import java.util.Objects;
-import org.firstinspires.ftc.teamcode.util.Calculations.HiveTarget;
-import org.firstinspires.ftc.teamcode.util.Calculations.Alliance;
+import org.firstinspires.ftc.teamcode.data.HiveTarget;
+import org.firstinspires.ftc.teamcode.data.Alliance;
 import org.firstinspires.ftc.teamcode.util.Calculations;
-import org.firstinspires.ftc.teamcode.util.TurretConfig;
+import org.firstinspires.ftc.teamcode.data.TurretConfig;
 
 public class Turret implements Mechanism {
-    public static final Turret INSTANCE = new Turret();
-    private Turret() { }
+    //TODO: tune turrent with odo before limelight
+    private final Drivetrain drivetrain;
+    private final Limelight limelight;
+
+    public Turret(Drivetrain drivetrain, Limelight limelight) {
+        this.drivetrain = Objects.requireNonNull(drivetrain);
+        this.limelight = Objects.requireNonNull(limelight);
+    }
     private NextMotor turret;
     private DcMotorImplEx encoder;
     private final PIDCoefficients gains = new PIDCoefficients(0, 0, 0);
@@ -41,14 +47,14 @@ public class Turret implements Mechanism {
 
     public void initialize(HardwareMap hardwareMap, Alliance alliance) {
         this.alliance = Objects.requireNonNull(alliance, "Alliance is required");
-        // Hardware disabled for drivetrain-only testing.
-        // encoder = hardwareMap.get(DcMotorImplEx.class, "turret");
-        // encoder.setPower(0);
-        // encoder.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        // encoder.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        // if (turret == null) turret = new NextMotor(() -> encoder);
-        // turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
-        // Limelight.INSTANCE.initialize(hardwareMap);
+        encoder = hardwareMap.get(DcMotorImplEx.class, "turret");
+        encoder.setPower(0);
+        // INIT defines the current physical turret position as forward zero.
+        encoder.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        encoder.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        if (turret == null) turret = new NextMotor(() -> encoder);
+        turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
+        limelight.initialize(hardwareMap);
         target = alliance.close;
         stopImmediately();
     }
@@ -77,7 +83,7 @@ public class Turret implements Mechanism {
             applyPower(0);
             return;
         }
-        Pose pose = Drivetrain.INSTANCE.getFollower().pose();
+        Pose pose = drivetrain.getFollower().pose();
         if (pose == null) { stopImmediately(); return; }
         HiveTarget selected = alliance.targetForY(pose.y(), TurretConfig.halfwayY);
         if (selected == null) { stopImmediately(); return; }
@@ -124,8 +130,8 @@ public class Turret implements Mechanism {
             clearVision();
             return;
         }
-        Limelight.INSTANCE.selectPipeline(TurretConfig.pipeline);
-        LLResult result = Limelight.INSTANCE.getLatestResult();
+        limelight.selectPipeline(TurretConfig.pipeline);
+        LLResult result = limelight.getLatestResult();
         if (result == null || !result.isValid() || result.getFiducialResults() == null) {
             clearVision();
             return;

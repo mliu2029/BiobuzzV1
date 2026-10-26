@@ -33,6 +33,11 @@ apply from: '../build.dependencies.gradle'
 android {
     namespace = 'org.firstinspires.ftc.teamcode'
 
+    testOptions {
+        // NextMotor's lazy hardware initialization logs through Android's Log API.
+        unitTests.returnDefaultValues = true
+    }
+
     packagingOptions {
         jniLibs.useLegacyPackaging true
     }
