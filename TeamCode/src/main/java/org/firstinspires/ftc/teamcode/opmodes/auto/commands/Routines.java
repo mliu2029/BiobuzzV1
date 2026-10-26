@@ -7,7 +7,7 @@ import java.util.function.Consumer;
 import org.firstinspires.ftc.teamcode.opmodes.auto.paths.IntakeAndParkPaths;
 import org.firstinspires.ftc.teamcode.opmodes.auto.paths.ReturnToShootPaths;
 import org.firstinspires.ftc.teamcode.opmodes.auto.paths.ShootAndParkPaths;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 
 /** Autonomous sequences, separate from coordinates and OpMode lifecycle. */
 public class Routines {

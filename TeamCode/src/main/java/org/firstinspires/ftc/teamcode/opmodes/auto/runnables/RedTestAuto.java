@@ -6,7 +6,7 @@ import dev.nextftc.robot.opmode.NextOpMode;
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
 import org.firstinspires.ftc.teamcode.opmodes.auto.commands.Routines;
 import org.firstinspires.ftc.teamcode.opmodes.auto.paths.IntakeAndParkPaths;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 
 // Registration remains disabled, as before the reorganization.
 // @NextAutonomous(name = "red hive+intake", group = "Pedro")

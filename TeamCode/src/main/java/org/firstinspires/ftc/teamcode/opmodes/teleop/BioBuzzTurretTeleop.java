@@ -2,7 +2,7 @@ package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
 import dev.nextftc.robot.triggers.CommandGamepad;
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.data.Alliance;
 
 public abstract class BioBuzzTurretTeleop extends TeleOp {
@@ -23,6 +23,8 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         telemetry.addData("TeleOp starting pose", OpModeStorage.autonomousEndPose);
         telemetry.addData("Alliance", alliance);
         telemetry.addData("Turret encoder ticks", robot.getTurret().getEncoderTicks());
+        telemetry.addData("Limelight", robot.getLimelight().isAvailable()
+                ? "Configured" : "Unavailable (check USB/config)");
         telemetry.update();
     }
 
@@ -37,6 +39,8 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         telemetry.addData("Alliance", alliance);
         telemetry.addData("Aiming at: ", robot.getTurret().getTarget());
         telemetry.addData("Aim mode", robot.getTurret().getMode());
+        telemetry.addData("Limelight", robot.getLimelight().isAvailable()
+                ? "Configured" : "Unavailable (check USB/config)");
         telemetry.addData("Turret degrees", robot.getTurret().getDegrees());
         telemetry.addData("Turret encoder ticks", robot.getTurret().getEncoderTicks());
         telemetry.addData("Target degrees", robot.getTurret().getTargetDegrees());

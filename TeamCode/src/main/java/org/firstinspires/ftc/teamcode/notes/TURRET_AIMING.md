@@ -90,7 +90,7 @@ Panels address. Confirm values on the robot before PLAY.
 
 | Setting | Source default | What it controls |
 | --- | --- | --- |
-| `ticksPerDegree` | 0 | Signed encoder counts per turret degree; must be nonzero |
+| `ticksPerDegree` | ≈ 0.291667 | Signed encoder counts per turret degree; verify sign physically |
 | `minDegrees` / `maxDegrees` | 0 / 0 | Measured clockwise/counterclockwise travel; must straddle zero |
 | `p` | 0 | Power per degree of position error |
 | `i` | 0 | Power from accumulated error over time |
@@ -109,7 +109,7 @@ Panels address. Confirm values on the robot before PLAY.
 | `acquireDegrees` | 10 | Maximum absolute corrected tx accepted for each tag |
 | `maxFrameAgeMs` | 100 | Maximum accepted staleness plus capture and targeting latency |
 
-The zero encoder scale and zero limits intentionally prevent movement. Valid
+The zero travel limits intentionally prevent movement. Valid
 calibration alone does not produce motion with all gains and `staticPower` at zero.
 Gains and `staticPower` must be nonnegative and finite. Source defaults are not a
 record of live Panels edits: write the final values back into `TurretConfig.java`.
@@ -148,29 +148,31 @@ abs(ticksPerDegree) = counts per motor output revolution
                      × motor output revolutions per turret revolution / 360
 ```
 
-### Your 1150 RPM motor and 24-tooth / 90-tooth gears
+### Your goBILDA bare motor and 24-tooth / 90-tooth gears
 
 The motor's 24-tooth gear drives the turret's 90-tooth gear, giving an external
 reduction of `90 / 24 = 3.75:1`. The motor output turns 3.75 times per turret turn.
-The goBILDA 1150 RPM Yellow Jacket specifies approximately 145.1 encoder counts per
-motor output revolution ([manufacturer specification](https://www.gobilda.com/content/spec_sheets/5203-2402-0005_spec_sheet.pdf)).
+The goBILDA bare motor has no internal gear reduction and provides 28 quadrature
+encoder counts per motor revolution ([manufacturer specification](https://www.gobilda.com/5000-series-12vdc-motor-with-8mm-rex-pinion-shaft/)).
 
 ```text
-counts per turret revolution = 145.1 × 3.75 = 544.125
-abs(ticksPerDegree) = 544.125 / 360 ≈ 1.51146
+counts per turret revolution = 28 × 3.75 = 105
+abs(ticksPerDegree) = 105 / 360 ≈ 0.291667
 ```
 
-Use `+1.51146` if physical counterclockwise turret rotation increases encoder counts,
-or `-1.51146` if it decreases counts. The gear sizes determine the magnitude, but
+Use `+0.291667` if physical counterclockwise turret rotation increases encoder counts,
+or `-0.291667` if it decreases counts. The gear sizes determine the magnitude, but
 the installed motor orientation and direction configuration determine the sign.
-The source remains at zero until that sign is verified.
+The source uses the positive magnitude; verify the sign before enabling motion.
 
-A measured 90-degree turret turn should change the encoder by about 136 counts;
-180 degrees should change it by about 272 counts. One count is about 0.66 turret
-degrees. Use these as checks against the physical measurements above.
+A measured 90-degree turret turn should change the encoder by about 26 counts;
+180 degrees should change it by about 52–53 counts. One count is about 3.43 turret
+degrees. Use these as checks against the physical measurements above. The default
+2-degree alignment tolerance is smaller than one encoder count, so confirm actual
+aiming accuracy and settling physically when tuning.
 
-The 145.1-count specification already includes the motor's internal gearbox; do not
-multiply by 5.2 again. Recalibrate after a motor, gearing, or encoder-direction change.
+Use only the external 3.75:1 reduction with this bare motor; there is no internal
+gearbox multiplier. Recalibrate after a motor, gearing, or encoder-direction change.
 
 A physical CCW move must display positive turret degrees. The signed scale also
 sets the output direction in this code. If powered movement goes away from the

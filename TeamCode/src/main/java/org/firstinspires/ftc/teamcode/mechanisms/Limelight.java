@@ -6,32 +6,26 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import dev.nextftc.robot.Mechanism;
 
 public class Limelight implements Mechanism {
-    public Limelight() { }
+    public Limelight(){}
 
-    private Limelight3A camera;
-    private int appliedPipeline = -1;
+    private Limelight3A limelight;
 
     public void initialize(HardwareMap hardwareMap) {
-        camera = hardwareMap.tryGet(Limelight3A.class, "limelight");
-        appliedPipeline = -1;
-        if (camera != null) {
-            camera.setPollRateHz(50);
-            camera.start();
-        }
+        limelight = hardwareMap.tryGet(Limelight3A.class, "limelight");
+        // A missing camera or a different device type under this name returns null.
+        if (limelight == null) return;
+        limelight.setPollRateHz(50);
+        limelight.start();
+
     }
 
-    public void selectPipeline(int pipeline) {
-        if (camera != null && appliedPipeline != pipeline) {
-            camera.pipelineSwitch(pipeline);
-            appliedPipeline = pipeline;
-        }
-    }
 
     public LLResult getLatestResult() {
-        return camera == null ? null : camera.getLatestResult();
+        return limelight == null ? null : limelight.getLatestResult();
     }
 
-    public void stopImmediately() {
-        if (camera != null) camera.stop();
+    public boolean isAvailable() {
+        return limelight != null;
     }
+
 }
