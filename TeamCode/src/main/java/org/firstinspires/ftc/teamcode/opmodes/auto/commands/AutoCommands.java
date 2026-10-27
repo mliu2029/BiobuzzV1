@@ -18,7 +18,6 @@ public class AutoCommands {
         this.status = status;
     }
 
-    /** Startup actions, executed by the routine after the OpMode's START callback. */
     public Command init() {
         return sequential(
                 Commands.instant(() -> status.accept("Starting")),

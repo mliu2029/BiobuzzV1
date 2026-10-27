@@ -30,7 +30,7 @@ import org.firstinspires.ftc.teamcode.vision.PollenVisionConfig;
 public class PollenTrackerTest extends NextOpMode {
     private final TelemetryManager panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
     private final Robot robot;
-    private PollenLocator pollenLocator;
+    private final PollenLocator pollenLocator;
     private Follower follower;
     private PathResult plan;
     private boolean following;
@@ -39,25 +39,24 @@ public class PollenTrackerTest extends NextOpMode {
     public PollenTrackerTest(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
+        robot.initialize(hardwareMap);
+        pollenLocator = new PollenLocator(hardwareMap);
+        PanelsCameraStream.INSTANCE.startStream(pollenLocator.getStream(), PollenVisionConfig.streamFps);
         panelsTelemetry.setUpdateInterval(50);
-        panelsTelemetry.addLine("Ready - press START");
+        panelsTelemetry.addLine("Initialized");
         panelsTelemetry.update(telemetry);
     }
 
     @Override
     public void start() {
-        robot.initialize(hardwareMap);
-        follower = robot.Drivetrain().getFollower();
+        follower = robot.getDrivetrain().getFollower();
         Pose startingPose = OpModeStorage.autonomousEndPose;
         follower.setPose(startingPose != null ? startingPose : Pose.zero());
         follower.update();
-        pollenLocator = new PollenLocator(hardwareMap);
-        PanelsCameraStream.INSTANCE.startStream(pollenLocator.getStream(), PollenVisionConfig.streamFps);
     }
 
     @Override
     public void periodic() {
-        if (follower == null || pollenLocator == null) return;
         Pose pose = follower.pose();
 
         if (gamepad1.cross && !lastCross) {
@@ -108,14 +107,9 @@ public class PollenTrackerTest extends NextOpMode {
 
     @Override
     public void end() {
-        try {
-            if (pollenLocator != null) {
-                PanelsCameraStream.INSTANCE.stopStream();
-                pollenLocator.close();
-            }
-        } finally {
-            robot.stopImmediately();
-        }
+        PanelsCameraStream.INSTANCE.stopStream();
+        pollenLocator.close();
+        robot.stopImmediately();
     }
 
     private static String format(Pose pose) {
