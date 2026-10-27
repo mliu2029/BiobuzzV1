@@ -12,44 +12,43 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
     protected BioBuzzTurretTeleop(Robot robot, Alliance alliance) {
         super(robot);
         this.alliance = alliance;
-        robot.getTurret().initialize(hardwareMap, alliance);
-        CommandGamepad operator = new CommandGamepad(gamepad2);
-        operator.dpadUp().onTrue(robot.getTurret().aimTurret);
-        operator.circle().onTrue(robot.getTurret().stopTurret);
     }
 
     @Override
     public void disabledPeriodic() {
-        telemetry.addLine("Turret encoder reset to forward zero.");
+        telemetry.addLine("START initializes the turret and resets its forward zero.");
         addControlTelemetry();
         telemetry.addLine("PLAY starts driving and automatic turret aiming.");
         telemetry.addData("TeleOp starting pose", OpModeStorage.autonomousEndPose);
         telemetry.addData("Alliance", alliance);
-        telemetry.addData("Turret encoder ticks", robot.getTurret().getEncoderTicks());
-        telemetry.addData("Limelight", robot.getLimelight().isAvailable()
-                ? "Configured" : "Unavailable (check USB/config)");
+        telemetry.addData("Limelight", "Not initialized until START");
         telemetry.update();
     }
 
     @Override
     public void start() {
         super.start(); // Restore the pose and start continuous gamepad 1 driving.
-        robot.getTurret().aimTurret.schedule();
+        robot.Turret().initialize(hardwareMap, alliance);
+        CommandGamepad operator = new CommandGamepad(gamepad2);
+        operator.dpadUp().onTrue(robot.Turret().aimTurret);
+        operator.circle().onTrue(robot.Turret().stopTurret);
+        robot.Turret().aimTurret.schedule();
     }
 
     @Override
     public void periodic() {
+        if (!started) return;
         addControlTelemetry();
         telemetry.addData("Alliance", alliance);
-        telemetry.addData("Aiming at: ", robot.getTurret().getTarget());
-        telemetry.addData("Aim mode", robot.getTurret().getMode());
-        telemetry.addData("Limelight", robot.getLimelight().isAvailable()
+        telemetry.addData("Aiming at: ", robot.Turret().getTarget());
+        telemetry.addData("Aim mode", robot.Turret().getMode());
+        telemetry.addData("Limelight", robot.Limelight().isAvailable()
                 ? "Configured" : "Unavailable (check USB/config)");
-        telemetry.addData("Turret degrees", robot.getTurret().getDegrees());
-        telemetry.addData("Turret encoder ticks", robot.getTurret().getEncoderTicks());
-        telemetry.addData("Target degrees", robot.getTurret().getTargetDegrees());
-        telemetry.addData("Aligned: ", robot.getTurret().isAligned());
-        telemetry.addData("Pose", robot.getDrivetrain().getFollower().pose());
+        telemetry.addData("Turret degrees", robot.Turret().getDegrees());
+        telemetry.addData("Turret encoder ticks", robot.Turret().getEncoderTicks());
+        telemetry.addData("Target degrees", robot.Turret().getTargetDegrees());
+        telemetry.addData("Aligned: ", robot.Turret().isAligned());
+        telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
         super.periodic();
     }
 

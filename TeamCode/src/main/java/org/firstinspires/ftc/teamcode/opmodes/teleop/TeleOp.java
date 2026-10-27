@@ -34,50 +34,61 @@ import dev.nextftc.robot.triggers.CommandGamepad;
 public abstract class TeleOp extends NextOpMode {
     private static final int VELOCITY_STEP = 25;
     protected final Robot robot;
+    protected boolean started;
 
     protected TeleOp(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
-        robot.initialize(hardwareMap);
-
-        CommandGamepad driver = new CommandGamepad(gamepad1);
-
-        driver.circle().onTrue(robot.getIntake().runIntake);
-        driver.square().onTrue(robot.getIntake().runIntakeReverse);
-        driver.dpadUp().onTrue(robot.getShooter().runFlywheel);
-        driver.dpadDown().onTrue(robot.getShooter().stopFlywheel);
-        driver.dpadRight().onTrue(robot.getShooter().instant(
-                () -> robot.getShooter().adjustVelocity(VELOCITY_STEP)));
-        driver.dpadLeft().onTrue(robot.getShooter().instant(
-                () -> robot.getShooter().adjustVelocity(-VELOCITY_STEP)));
-
-        // driver.rightBumper().onTrue(robot.getTransfer().openBlocker);
-        // driver.rightBumper().onFalse(robot.getTransfer().closeBlocker);
-
-        telemetry.addData("Status", "Initialized");
+        telemetry.addData("Status", "Ready - press START");
         telemetry.update();
+    }
+
+    private void configureControls() {
+        CommandGamepad driver = new CommandGamepad(gamepad1);
+        CommandGamepad driver2=new CommandGamepad(gamepad2);
+
+        driver.circle().onTrue(robot.Intake().runIntake);
+        driver.square().onTrue(robot.Intake().runIntakeReverse);
+        driver.dpadUp().onTrue(robot.Shooter().runFlywheel);
+        driver.dpadDown().onTrue(robot.Shooter().stopFlywheel);
+        driver.dpadRight().onTrue(robot.Shooter().instant(
+                () -> robot.Shooter().adjustVelocity(VELOCITY_STEP)));
+        driver.dpadLeft().onTrue(robot.Shooter().instant(
+                () -> robot.Shooter().adjustVelocity(-VELOCITY_STEP)));
+
+         driver.rightBumper().onTrue(robot.Transfer().openBlocker);
+         driver.rightBumper().onFalse(robot.Transfer().closeBlocker);
+
+
+        //debug tools for gamepad 2
+        driver2.dpadLeft().onTrue(robot.Drivetrain().relocalize());
     }
 
     @Override
     public void start() {
+        robot.initialize(hardwareMap);
+        configureControls();
         Pose startingPose = OpModeStorage.autonomousEndPose;
-        robot.getDrivetrain().getFollower().setPose(
+        robot.Drivetrain().getFollower().setPose(
                 startingPose != null ? startingPose : Pose.zero());
-        robot.getDrivetrain().getFollower().update();
+        robot.Drivetrain().getFollower().update();
         robot.startDrive(gamepad1);
+        started = true;
     }
 
     @Override
     public void periodic() {
-        telemetry.addData("Shooter target (rad/s)", robot.getShooter().getTargetVelocity());
-        telemetry.addData("Flywheel velocity (rad/s)", robot.getShooter().getFlywheelVelocity());
-        telemetry.addData("Flywheel2 velocity (rad/s)", robot.getShooter().getRollerVelocity());
-        telemetry.addData("Pose", robot.getDrivetrain().getFollower().pose());
+        if (!started) return;
+        telemetry.addData("Shooter target (rad/s)", robot.Shooter().getTargetVelocity());
+        telemetry.addData("Flywheel velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
+        telemetry.addData("Flywheel2 velocity (rad/s)", robot.Shooter().getRollerVelocity());
+        telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
         telemetry.update();
     }
 
     @Override
     public void end() {
+        started = false;
         robot.stopImmediately();
     }
 }

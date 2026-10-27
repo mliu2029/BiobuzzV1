@@ -18,20 +18,22 @@ public class AutoCommands {
         this.status = status;
     }
 
-    public Command shootPreload() {
+    /** Startup actions, executed by the routine after the OpMode's START callback. */
+    public Command init() {
         return sequential(
-                Commands.instant(() -> status.accept("Shooting")),
-                robot.getShooter().runFlywheel,
-                Commands.waitMs(2500),
-                robot.getIntake().runIntake,
-                Commands.waitMs(1500)
+                Commands.instant(() -> status.accept("Starting")),
+                robot.Shooter().runFlywheel,
+                robot.Transfer().openBlocker,
+                robot.Ramp().up,
+                robot.Turret().aimTurret,
+                robot.Intake().runIntake
         );
     }
 
     public Command followPath(Path path, String name) {
         return sequential(
                 Commands.instant(() -> status.accept(name)),
-                robot.getDrivetrain().followPath(path)
+                robot.Drivetrain().followPath(path)
         );
     }
 

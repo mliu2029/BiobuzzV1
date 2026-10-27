@@ -13,7 +13,7 @@ import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.opmode.NextTeleop;
 import java.util.Locale;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 
 @Configurable
 @NextTeleop(name = "Launcher Test", group = "Tuning")
@@ -34,21 +34,26 @@ public class ShooterTest extends NextOpMode {
     private final PIDController controller = new PIDController(gains);
     private final SimpleFFCoefficients feedforwardGains = new SimpleFFCoefficients(0.0, f, 0.0);
     private final SimpleFeedforward feedforward = new SimpleFeedforward(feedforwardGains);
-    private final DcMotorEx launcher;
+    private DcMotorEx launcher;
     private boolean wasUsingPid;
 
     public ShooterTest(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
-        launcher = hardwareMap.get(DcMotorEx.class, "launcher");
-        launcher.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        launcher.setPower(0);
         panelsTelemetry.setUpdateInterval(50);
-        panelsTelemetry.addLine("Initialized");
+        panelsTelemetry.addLine("Ready - press START");
         panelsTelemetry.update(telemetry);
     }
 
     @Override
+    public void start() {
+        launcher = hardwareMap.get(DcMotorEx.class, "launcher");
+        launcher.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        launcher.setPower(0);
+    }
+
+    @Override
     public void periodic() {
+        if (launcher == null) return;
         gains.kP = p;
         gains.kI = i;
         gains.kD = d;
@@ -79,7 +84,7 @@ public class ShooterTest extends NextOpMode {
 
     @Override
     public void end() {
-        launcher.setPower(0);
+        if (launcher != null) launcher.setPower(0);
         panelsTelemetry.addLine("Stopped");
         panelsTelemetry.update(telemetry);
     }

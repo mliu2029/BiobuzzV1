@@ -13,7 +13,7 @@ import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.opmode.NextTeleop;
 import java.util.List;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
 import org.firstinspires.ftc.teamcode.vision.PollenLocator;
 import org.firstinspires.ftc.teamcode.vision.PollenVisionConfig;
@@ -30,7 +30,7 @@ import org.firstinspires.ftc.teamcode.vision.PollenVisionConfig;
 public class PollenTrackerTest extends NextOpMode {
     private final TelemetryManager panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
     private final Robot robot;
-    private final PollenLocator pollenLocator;
+    private PollenLocator pollenLocator;
     private Follower follower;
     private PathResult plan;
     private boolean following;
@@ -39,24 +39,25 @@ public class PollenTrackerTest extends NextOpMode {
     public PollenTrackerTest(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
-        robot.initialize(hardwareMap);
-        pollenLocator = new PollenLocator(hardwareMap);
-        PanelsCameraStream.INSTANCE.startStream(pollenLocator.getStream(), PollenVisionConfig.streamFps);
         panelsTelemetry.setUpdateInterval(50);
-        panelsTelemetry.addLine("Initialized");
+        panelsTelemetry.addLine("Ready - press START");
         panelsTelemetry.update(telemetry);
     }
 
     @Override
     public void start() {
-        follower = robot.getDrivetrain().getFollower();
+        robot.initialize(hardwareMap);
+        follower = robot.Drivetrain().getFollower();
         Pose startingPose = OpModeStorage.autonomousEndPose;
         follower.setPose(startingPose != null ? startingPose : Pose.zero());
         follower.update();
+        pollenLocator = new PollenLocator(hardwareMap);
+        PanelsCameraStream.INSTANCE.startStream(pollenLocator.getStream(), PollenVisionConfig.streamFps);
     }
 
     @Override
     public void periodic() {
+        if (follower == null || pollenLocator == null) return;
         Pose pose = follower.pose();
 
         if (gamepad1.cross && !lastCross) {
@@ -107,9 +108,14 @@ public class PollenTrackerTest extends NextOpMode {
 
     @Override
     public void end() {
-        PanelsCameraStream.INSTANCE.stopStream();
-        pollenLocator.close();
-        robot.stopImmediately();
+        try {
+            if (pollenLocator != null) {
+                PanelsCameraStream.INSTANCE.stopStream();
+                pollenLocator.close();
+            }
+        } finally {
+            robot.stopImmediately();
+        }
     }
 
     private static String format(Pose pose) {

@@ -2,7 +2,9 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.ivy.pedro.PedroCommands;
+import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -29,6 +31,9 @@ public class Drivetrain implements Mechanism {
             follower.update();
         })
                 .setEnd(condition -> stopImmediately());
+    }
+    public Command relocalize() {
+        return Commands.instant(() -> follower.setPose(new Pose(8, 8, 0)));
     }
 
     public Command followPath(Path path) {

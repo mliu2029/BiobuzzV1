@@ -22,6 +22,7 @@ public class VelocityPidTuning extends NextOpMode {
     public static volatile boolean runTransfer = false;
 
     private final Robot robot;
+    private boolean started;
     private final TelemetryManager panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
     public VelocityPidTuning(Robot robot) {
@@ -29,36 +30,38 @@ public class VelocityPidTuning extends NextOpMode {
         this.robot = robot;
         runIntake = false;
         runTransfer = false;
-        robot.initialize(hardwareMap);
         panelsTelemetry.setUpdateInterval(50);
-        panelsTelemetry.addLine("Initialized");
+        panelsTelemetry.addLine("Ready - press START");
         panelsTelemetry.update(telemetry);
     }
 
     @Override
     public void start() {
+        robot.initialize(hardwareMap);
         runIntake = false;
         runTransfer = false;
+        started = true;
     }
 
     @Override
     public void periodic() {
-        robot.getShooter().setPIDFCoefficients(p, i, d, f);
+        if (!started) return;
+        robot.Shooter().setPIDFCoefficients(p, i, d, f);
 
         if(runIntake){
-            robot.getIntake().runIntake.schedule();
+            robot.Intake().runIntake.schedule();
         }else{
-            robot.getIntake().stopIntake.schedule();
+            robot.Intake().stopIntake.schedule();
         }
         // (runTransfer ? robot.getTransfer().openBlocker : robot.getTransfer().closeBlocker).schedule();
 
-        robot.getShooter().setVelocity(targetVelocity);
-        panelsTelemetry.addData("Target Velocity (rad/s)", robot.getShooter().isEnabled()
-                ? robot.getShooter().getTargetVelocity() : 0.0);
-        panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.getShooter().getFlywheelVelocity());
-        panelsTelemetry.addData("Flywheel2 Velocity (rad/s)", robot.getShooter().getRollerVelocity());
-        panelsTelemetry.addData("Flywheel Power", robot.getShooter().getFlywheelPower());
-        panelsTelemetry.addData("Flywheel2 Power", robot.getShooter().getRollerPower());
+        robot.Shooter().setVelocity(targetVelocity);
+        panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
+                ? robot.Shooter().getTargetVelocity() : 0.0);
+        panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
+        panelsTelemetry.addData("Flywheel2 Velocity (rad/s)", robot.Shooter().getRollerVelocity());
+        panelsTelemetry.addData("Flywheel Power", robot.Shooter().getFlywheelPower());
+        panelsTelemetry.addData("Flywheel2 Power", robot.Shooter().getRollerPower());
         panelsTelemetry.addLine(String.format(Locale.US,
                 "PIDF | P: %.5f, I: %.5f, D: %.5f, F: %.5f", p, i, d, f));
         panelsTelemetry.update(telemetry);
@@ -66,6 +69,7 @@ public class VelocityPidTuning extends NextOpMode {
 
     @Override
     public void end() {
+        started = false;
         runIntake = false;
         runTransfer = false;
         robot.stopImmediately();

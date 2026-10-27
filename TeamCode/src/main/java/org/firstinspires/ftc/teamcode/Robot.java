@@ -19,16 +19,18 @@ public class Robot implements NextRobot {
     private final Limelight limelight = new Limelight();
     private final Turret turret = new Turret(drivetrain, limelight);
     private final Transfer transfer = new Transfer();
+    private final Ramp ramp =new Ramp();
 
     private final Set<Mechanism> mechanisms = Collections.unmodifiableSet(
-            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, limelight, turret)));
+            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, limelight, turret,ramp)));
 
-    public Drivetrain getDrivetrain() { return drivetrain; }
-    public Intake getIntake() { return intake; }
-    public Shooter getShooter() { return shooter; }
-    public Limelight getLimelight() { return limelight; }
-    public Turret getTurret() { return turret; }
-    public Transfer getTransfer() { return transfer; }
+    public Drivetrain Drivetrain() { return drivetrain; }
+    public Intake Intake() { return intake; }
+    public Shooter Shooter() { return shooter; }
+    public Limelight Limelight() { return limelight; }
+    public Turret Turret() { return turret; }
+    public Transfer Transfer() { return transfer; }
+    public Ramp Ramp() { return ramp; }
 
     @Override
     public Set<Mechanism> getMechanisms() {
