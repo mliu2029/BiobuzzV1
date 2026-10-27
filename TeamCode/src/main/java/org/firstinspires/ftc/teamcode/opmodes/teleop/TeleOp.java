@@ -25,7 +25,7 @@ package org.firstinspires.ftc.teamcode.opmodes.teleop;
 import com.pedropathing.math.Pose;
 
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;

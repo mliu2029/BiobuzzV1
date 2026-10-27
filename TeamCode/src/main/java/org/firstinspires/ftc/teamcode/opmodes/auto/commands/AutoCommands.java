@@ -22,9 +22,9 @@ public class AutoCommands {
         return sequential(
                 Commands.instant(() -> status.accept("Shooting")),
                 robot.getShooter().runFlywheel,
-                Commands.waitMs(500),
+                Commands.waitMs(2500),
                 robot.getIntake().runIntake,
-                Commands.waitMs(5000)
+                Commands.waitMs(1500)
         );
     }
 

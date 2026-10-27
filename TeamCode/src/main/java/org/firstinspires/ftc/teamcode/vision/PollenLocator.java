@@ -35,6 +35,8 @@ public class PollenLocator {
         portal = new VisionPortal.Builder()
                 .setCamera(hardwareMap.get(WebcamName.class, webcamName))
                 .setCameraResolution(new Size(cameraWidth, cameraHeight))
+                // This webcam supports higher frame rates at 1280x720 with MJPEG.
+                .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
                 .addProcessor(detector)
                 .enableLiveView(true)
                 .build();
