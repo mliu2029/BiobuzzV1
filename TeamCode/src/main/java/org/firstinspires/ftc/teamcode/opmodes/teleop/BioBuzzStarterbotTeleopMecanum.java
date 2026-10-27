@@ -23,7 +23,7 @@
 package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
 import dev.nextftc.robot.opmode.NextTeleop;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 
 @NextTeleop(name = "BioBuzz Main TeleOp", group = "StarterBot")
 public class BioBuzzStarterbotTeleopMecanum extends TeleOp {

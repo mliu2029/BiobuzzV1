@@ -14,7 +14,7 @@ import dev.nextftc.robot.Mechanism;
 import java.util.Objects;
 import org.firstinspires.ftc.teamcode.data.HiveTarget;
 import org.firstinspires.ftc.teamcode.data.Alliance;
-import org.firstinspires.ftc.teamcode.util.Calculations;
+import org.firstinspires.ftc.teamcode.data.Calculations;
 import org.firstinspires.ftc.teamcode.data.TurretConfig;
 
 public class Turret implements Mechanism {
@@ -27,7 +27,7 @@ public class Turret implements Mechanism {
         this.limelight = Objects.requireNonNull(limelight);
     }
     private NextMotor turret;
-    private DcMotorImplEx encoder;
+    private DcMotorImplEx turretMotor;
     private final PIDCoefficients gains = new PIDCoefficients(0, 0, 0);
     private final PIDController pid = new PIDController(gains);
     private HiveTarget target = HiveTarget.RED_CLOSE;
@@ -47,12 +47,11 @@ public class Turret implements Mechanism {
 
     public void initialize(HardwareMap hardwareMap, Alliance alliance) {
         this.alliance = Objects.requireNonNull(alliance, "Alliance is required");
-        encoder = hardwareMap.get(DcMotorImplEx.class, "turret");
-        encoder.setPower(0);
-        // INIT defines the current physical turret position as forward zero.
-        encoder.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        encoder.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        if (turret == null) turret = new NextMotor(() -> encoder);
+        turretMotor = hardwareMap.get(DcMotorImplEx.class, "turret");
+        turretMotor.setPower(0);
+        turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        if (turret == null) turret = new NextMotor(() -> turretMotor);
         turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         limelight.initialize(hardwareMap);
         target = alliance.close;
@@ -113,16 +112,15 @@ public class Turret implements Mechanism {
         applyPower(output);
     }
 
-    /** Keep correcting small errors too; tolerance only determines isAligned(). */
     double calculatePower(double error) {
         gains.kP = TurretConfig.p;
         gains.kI = TurretConfig.i;
         gains.kD = TurretConfig.d;
         double output = pid.calculate(error);
         output += Math.signum(error) * TurretConfig.staticPower;
-        // Output sign follows encoder counts, while angles are always CCW-positive.
         output *= Math.signum(TurretConfig.ticksPerDegree);
         return Math.max(-TurretConfig.maxPower, Math.min(TurretConfig.maxPower, output));
+//        counter clockwise is positive
     }
 
     private void updateVision(double current) {
@@ -130,7 +128,6 @@ public class Turret implements Mechanism {
             clearVision();
             return;
         }
-        limelight.selectPipeline(TurretConfig.pipeline);
         LLResult result = limelight.getLatestResult();
         if (result == null || !result.isValid() || result.getFiducialResults() == null) {
             clearVision();
@@ -189,12 +186,12 @@ public class Turret implements Mechanism {
     }
 
     public double getDegrees() {
-        return encoder == null || TurretConfig.ticksPerDegree == 0 ? Double.NaN
-                : encoder.getCurrentPosition() / TurretConfig.ticksPerDegree;
+        return turretMotor == null || TurretConfig.ticksPerDegree == 0 ? Double.NaN
+                : turretMotor.getCurrentPosition() / TurretConfig.ticksPerDegree;
     }
 
     public double getTargetDegrees() { return targetDegrees; }
-    public int getEncoderTicks() { return encoder == null ? 0 : encoder.getCurrentPosition(); }
+    public int getEncoderTicks() { return turretMotor == null ? 0 : turretMotor.getCurrentPosition(); }
     public String getMode() { return mode; }
     public HiveTarget getTarget() { return target; }
     public boolean isAligned() {

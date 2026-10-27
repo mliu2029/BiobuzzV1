@@ -2,9 +2,10 @@ package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
 import dev.nextftc.robot.triggers.CommandGamepad;
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.data.Alliance;
 
+/** Alliance turret test with automatic aiming and the standard gamepad 1 drivetrain controls. */
 public abstract class BioBuzzTurretTeleop extends TeleOp {
     private final Alliance alliance;
 
@@ -20,28 +21,40 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
     @Override
     public void disabledPeriodic() {
         telemetry.addLine("Turret encoder reset to forward zero.");
+        addControlTelemetry();
+        telemetry.addLine("PLAY starts driving and automatic turret aiming.");
         telemetry.addData("TeleOp starting pose", OpModeStorage.autonomousEndPose);
         telemetry.addData("Alliance", alliance);
         telemetry.addData("Turret encoder ticks", robot.getTurret().getEncoderTicks());
+        telemetry.addData("Limelight", robot.getLimelight().isAvailable()
+                ? "Configured" : "Unavailable (check USB/config)");
         telemetry.update();
     }
 
     @Override
     public void start() {
-        super.start();
+        super.start(); // Restore the pose and start continuous gamepad 1 driving.
         robot.getTurret().aimTurret.schedule();
     }
 
     @Override
     public void periodic() {
+        addControlTelemetry();
         telemetry.addData("Alliance", alliance);
         telemetry.addData("Aiming at: ", robot.getTurret().getTarget());
         telemetry.addData("Aim mode", robot.getTurret().getMode());
+        telemetry.addData("Limelight", robot.getLimelight().isAvailable()
+                ? "Configured" : "Unavailable (check USB/config)");
         telemetry.addData("Turret degrees", robot.getTurret().getDegrees());
         telemetry.addData("Turret encoder ticks", robot.getTurret().getEncoderTicks());
         telemetry.addData("Target degrees", robot.getTurret().getTargetDegrees());
         telemetry.addData("Aligned: ", robot.getTurret().isAligned());
         telemetry.addData("Pose", robot.getDrivetrain().getFollower().pose());
         super.periodic();
+    }
+
+    private void addControlTelemetry() {
+        telemetry.addLine("Gamepad 1: right stick drives/strafes; left stick X turns.");
+        telemetry.addLine("Gamepad 2: Circle stops auto aim; D-pad up resumes it.");
     }
 }

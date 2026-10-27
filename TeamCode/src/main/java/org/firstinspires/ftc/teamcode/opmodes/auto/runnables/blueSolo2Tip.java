@@ -2,22 +2,22 @@ package org.firstinspires.ftc.teamcode.opmodes.auto.runnables;
 
 import com.pedropathing.follower.Follower;
 import dev.nextftc.robot.opmode.BulkReadHook;
+import dev.nextftc.robot.opmode.NextAutonomous;
 import dev.nextftc.robot.opmode.NextOpMode;
+import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
 import org.firstinspires.ftc.teamcode.opmodes.auto.commands.Routines;
-import org.firstinspires.ftc.teamcode.opmodes.auto.paths.ReturnToShootPaths;
-import org.firstinspires.ftc.teamcode.robot.Robot;
 
-// Registration remains disabled, as before the reorganization.
-// @NextAutonomous(name = "red shoot twice", group = "Pedro")
-public class RedTestReturnToShootAuto extends NextOpMode {
+/** Runs the red solo sequence mirrored across both field centerlines. */
+@NextAutonomous(name = "Blue Solo (2 Tip)", group = "Pedro")
+public class blueSolo2Tip extends NextOpMode {
     private final Robot robot;
     private final Follower follower;
-    private final ReturnToShootPaths paths = new ReturnToShootPaths();
+    private final org.firstinspires.ftc.teamcode.opmodes.auto.paths.blueSolo2Tip paths = new org.firstinspires.ftc.teamcode.opmodes.auto.paths.blueSolo2Tip();
     private final Routines routines;
     private String currentPath = "Ready";
 
-    public RedTestReturnToShootAuto(Robot robot) {
+    public blueSolo2Tip(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
         robot.initialize(hardwareMap);
@@ -31,7 +31,7 @@ public class RedTestReturnToShootAuto extends NextOpMode {
 
     @Override
     public void start() {
-        routines.returnToShoot(paths).schedule();
+        routines.blueSolo2Tip(paths).schedule();
     }
 
     @Override

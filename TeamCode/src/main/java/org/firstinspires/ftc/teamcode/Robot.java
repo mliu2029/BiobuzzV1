@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.robot;
+package org.firstinspires.ftc.teamcode;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.commands.Commands;
@@ -12,7 +12,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import org.firstinspires.ftc.teamcode.mechanisms.*;
 
-/** Owns the mechanisms shared by this OpMode. */
 public class Robot implements NextRobot {
     private final Drivetrain drivetrain = new Drivetrain();
     private final Intake intake = new Intake();
@@ -41,7 +40,6 @@ public class Robot implements NextRobot {
         shooter.initialize();
         intake.stopImmediately();
         turret.stopImmediately();
-        limelight.stopImmediately();
     }
 
     public void startDrive(Gamepad gamepad) {
@@ -57,6 +55,5 @@ public class Robot implements NextRobot {
         intake.stopImmediately();
         shooter.stopImmediately();
         turret.stopImmediately();
-        limelight.stopImmediately();
     }
 }

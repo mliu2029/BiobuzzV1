@@ -1,8 +1,6 @@
-package org.firstinspires.ftc.teamcode.util;
+package org.firstinspires.ftc.teamcode.data;
 
-import org.firstinspires.ftc.teamcode.data.HiveTarget;
-
-public final class Calculations {
+public final class  Calculations {
     private Calculations() { }
 
 // calculation for turret

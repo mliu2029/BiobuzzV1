@@ -25,7 +25,7 @@ package org.firstinspires.ftc.teamcode.opmodes.teleop;
 import com.pedropathing.math.Pose;
 
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
@@ -44,7 +44,7 @@ public abstract class TeleOp extends NextOpMode {
 
         driver.circle().onTrue(robot.getIntake().runIntake);
         driver.square().onTrue(robot.getIntake().runIntakeReverse);
-        driver.dpadUp().and(driver.dpadDown().negate()).onTrue(robot.getShooter().runFlywheel);
+        driver.dpadUp().onTrue(robot.getShooter().runFlywheel);
         driver.dpadDown().onTrue(robot.getShooter().stopFlywheel);
         driver.dpadRight().onTrue(robot.getShooter().instant(
                 () -> robot.getShooter().adjustVelocity(VELOCITY_STEP)));

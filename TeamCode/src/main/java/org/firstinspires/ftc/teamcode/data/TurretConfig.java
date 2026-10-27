@@ -8,7 +8,8 @@ public final class TurretConfig {
     private TurretConfig() { }
 
 
-    public static double ticksPerDegree = 1.51146;
+    // goBILDA bare motor: 28 counts/rev
+    public static double ticksPerDegree = 28.0 * (90.0 / 24.0) / 360.0;
     public static double minDegrees = 0;
     public static double maxDegrees = 0;
     public static double p = 0;
@@ -16,8 +17,7 @@ public final class TurretConfig {
     public static double d = 0;
     public static double staticPower = 0;
     public static double maxPower = 0.25;
-    public static double toleranceDegrees = 2; // Alignment reporting; PID remains active.
-    // Existing blue autos mirror around 70.75 on the 141.5-inch Pedro field.
+    public static double toleranceDegrees = 2;
     public static double halfwayY = 70.75;
 
     public static boolean useVision = false;

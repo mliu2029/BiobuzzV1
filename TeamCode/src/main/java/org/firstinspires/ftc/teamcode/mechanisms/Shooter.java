@@ -8,14 +8,13 @@ import dev.nextftc.units.Units;
 
 public class Shooter implements Mechanism {
 
-    // TODO: retune this PID.
-    // Gains use NextMotor default scaling: one radian per encoder tick.
-    public static final double DEFAULT_P = 0.01686;
+    // TODO: retune ts PID.
+    public static final double DEFAULT_P = 0.001;
     public static final double DEFAULT_I = 0.0;
-    public static final double DEFAULT_D = 0.00116;
-    public static final double DEFAULT_F = 0.000507;
+    public static final double DEFAULT_D = 0.0;
+    public static final double DEFAULT_F = 0.000357;
 
-    private static final double DEFAULT_TARGET_VELOCITY = 1375;
+    private static final double DEFAULT_TARGET_VELOCITY = 1550;
 
     private final NextMotor flywheel = new NextMotor("flywheel");
     private final NextMotor roller = new NextMotor("rollers");

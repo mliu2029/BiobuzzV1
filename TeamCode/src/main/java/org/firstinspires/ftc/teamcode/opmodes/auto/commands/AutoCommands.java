@@ -6,7 +6,7 @@ import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.paths.Path;
 import java.util.function.Consumer;
-import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.Robot;
 
 /** Reusable autonomous actions using the OpMode's existing robot. */
 public class AutoCommands {
@@ -22,10 +22,9 @@ public class AutoCommands {
         return sequential(
                 Commands.instant(() -> status.accept("Shooting")),
                 robot.getShooter().runFlywheel,
-                Commands.waitMs(500),
+                Commands.waitMs(2500),
                 robot.getIntake().runIntake,
-                // Transfer hardware remains disabled.
-                Commands.waitMs(5000)
+                Commands.waitMs(1500)
         );
     }
 
