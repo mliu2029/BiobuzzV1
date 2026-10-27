@@ -15,12 +15,17 @@ public final class PollenVisionConfig {
     // (Logitech C920 is about 70.4 degrees across at 16:9).
     public static double horizontalFovDegrees = 70.4;
 
+    // Panels camera stream: frames are shrunk to this width before they are
+    // JPEG-encoded, so a smaller width means a higher reachable frame rate.
+    public static int streamWidth = 640;
+    public static int streamFps = 30;
+
     // Lens position relative to the robot's center, Pedro robot frame (+x forward, +y left).
-    public static double cameraForward = 6;
-    public static double cameraLeft = 0;
-    public static double cameraHeightIn = 8;
+    public static double cameraForward = 4;
+    public static double cameraLeft = -4;
+    public static double cameraHeightIn = 6.5;
     // Degrees below horizontal; 0 looks straight ahead.
-    public static double cameraPitch = 20;
+    public static double cameraPitch = 0;
     // Degrees counter-clockwise from the robot's front.
     public static double cameraYaw = 0;
 

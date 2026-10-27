@@ -16,6 +16,7 @@ import com.skeletonarmy.marrow.zones.Zone;
 import java.util.ArrayList;
 import java.util.List;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.stream.CameraStreamSource;
 import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.teamcode.vision.BallBlobPipeline.BallBlob;
@@ -29,15 +30,34 @@ import org.firstinspires.ftc.teamcode.vision.BallBlobPipeline.BallColor;
  */
 public class PollenLocator {
     private final Detector detector = new Detector();
+    private final PollenStreamOverlay overlay = new PollenStreamOverlay(this, detector);
     private final VisionPortal portal;
 
     public PollenLocator(HardwareMap hardwareMap) {
         portal = new VisionPortal.Builder()
                 .setCamera(hardwareMap.get(WebcamName.class, webcamName))
                 .setCameraResolution(new Size(cameraWidth, cameraHeight))
-                .addProcessor(detector)
+                .addProcessors(detector, overlay)
                 .enableLiveView(true)
                 .build();
+    }
+
+    /**
+     * Webcam feed with detections and the planned path drawn on it, for
+     * {@code PanelsCameraStream.INSTANCE.startStream(locator.getStream(), fps)}.
+     */
+    public CameraStreamSource getStream() {
+        return overlay;
+    }
+
+    /** Feed the overlay the current pose and the path being followed (null for none). */
+    public void updateOverlay(Pose robotPose, PathResult plan) {
+        overlay.update(robotPose, plan);
+    }
+
+    /** Frames handed to the Panels stream so far; 0 means Panels never asked for one. */
+    public int getStreamFramesSent() {
+        return overlay.getFramesSent();
     }
 
     /** Field positions of every pollen in view. Headings point from the robot to the pollen. */
@@ -147,6 +167,36 @@ public class PollenLocator {
         double y = robotPose.y() + rx * Math.sin(h) + ry * Math.cos(h);
         if (x < 0 || y < 0 || x > fieldSize || y > fieldSize) return null;
         return new Pose(x, y, Math.atan2(y - robotPose.y(), x - robotPose.x()));
+    }
+
+    /**
+     * Inverse of {@link #project}: the pixel {u, v} where a field point {@code heightIn}
+     * above the floor appears. Null when it is behind the camera or far outside the frame.
+     */
+    public double[] toPixel(double x, double y, double heightIn, Pose robotPose) {
+        // Field frame -> robot frame
+        double h = robotPose.heading();
+        double dx = x - robotPose.x(), dy = y - robotPose.y();
+        double rx = dx * Math.cos(h) + dy * Math.sin(h);
+        double ry = -dx * Math.sin(h) + dy * Math.cos(h);
+
+        // Robot frame -> lens frame
+        double yaw = Math.toRadians(cameraYaw);
+        double fx = rx - cameraForward, ly = ry - cameraLeft;
+        double forward = fx * Math.cos(yaw) + ly * Math.sin(yaw);
+        double left = -fx * Math.sin(yaw) + ly * Math.cos(yaw);
+        double down = cameraHeightIn - heightIn;
+
+        // Rotate by the pitch onto the optical axis
+        double pitch = Math.toRadians(cameraPitch);
+        double depth = forward * Math.cos(pitch) + down * Math.sin(pitch);
+        if (depth < 1) return null;                 // behind or inside the lens
+        double xn = -left / depth;
+        double yn = (-forward * Math.sin(pitch) + down * Math.cos(pitch)) / depth;
+        if (Math.abs(xn) > 10 || Math.abs(yn) > 10) return null;
+
+        double[] k = detector.intrinsics();
+        return new double[] {k[0] * xn + k[2], k[1] * yn + k[3]};
     }
 
     /** Hive Vision's detector, also keeping the frame size and the SDK's lens calibration. */

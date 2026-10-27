@@ -221,7 +221,7 @@ follower.follow(PedroPathingConverter.toPath(route));
 `planPath` sends the visible pollen to Marrow's Weaver, which orders them and avoids the
 HIVE legs and any red/blue nectar it sees. Set the webcam name, mounting (forward/left
 offset, height, downward pitch, yaw), and field layout in `vision/PollenVisionConfig`
-(editable in Panels). The webcam is named `Webcam 1` by default.
+(editable in Panels). The webcam is named `webcam` by default.
 
 `Pollen Tracker Test` (Tuning group) shows each pollen's x/y. Cross follows a Weaver path
 through the visible pollen; Circle returns to manual driving. To check the camera mounting,

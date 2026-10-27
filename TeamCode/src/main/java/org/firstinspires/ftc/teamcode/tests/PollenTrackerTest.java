@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.tests;
 
+import com.bylazar.camerastream.PanelsCameraStream;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.follower.Follower;
@@ -12,15 +13,18 @@ import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.opmode.NextTeleop;
 import java.util.List;
-import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.subsystems.Drivetrain;
-import org.firstinspires.ftc.teamcode.util.OpModeStorage;
+import org.firstinspires.ftc.teamcode.robot.Robot;
+import org.firstinspires.ftc.teamcode.data.OpModeStorage;
 import org.firstinspires.ftc.teamcode.vision.PollenLocator;
+import org.firstinspires.ftc.teamcode.vision.PollenVisionConfig;
 
 /**
  * Drive around and read pollen positions in Pedro coordinates. Cross plans a Weaver path
  * through the visible pollen and follows it; Circle cancels back to manual driving.
  * The robot starts at the autonomous end pose, so place it where that pose says.
+ *
+ * Telemetry and the webcam go to Panels: open the Camera Stream panel to see every
+ * pollen and nectar circled, and the planned path drawn with an arrow per pollen.
  */
 @NextTeleop(name = "Pollen Tracker Test", group = "Tuning")
 public class PollenTrackerTest extends NextOpMode {
@@ -37,6 +41,7 @@ public class PollenTrackerTest extends NextOpMode {
         this.robot = robot;
         robot.initialize(hardwareMap);
         pollenLocator = new PollenLocator(hardwareMap);
+        PanelsCameraStream.INSTANCE.startStream(pollenLocator.getStream(), PollenVisionConfig.streamFps);
         panelsTelemetry.setUpdateInterval(50);
         panelsTelemetry.addLine("Initialized");
         panelsTelemetry.update(telemetry);
@@ -44,7 +49,7 @@ public class PollenTrackerTest extends NextOpMode {
 
     @Override
     public void start() {
-        follower = Drivetrain.INSTANCE.getFollower();
+        follower = robot.getDrivetrain().getFollower();
         Pose startingPose = OpModeStorage.autonomousEndPose;
         follower.setPose(startingPose != null ? startingPose : Pose.zero());
         follower.update();
@@ -76,10 +81,12 @@ public class PollenTrackerTest extends NextOpMode {
             follower.manual(forward * scale, -strafe * scale, -rotate * scale);
         }
         follower.update();
+        pollenLocator.updateOverlay(pose, following ? plan : null);
 
         List<Pose> pollen = pollenLocator.getPollen(pose);
         panelsTelemetry.addData("Robot", format(pose));
         panelsTelemetry.addData("Following", following);
+        panelsTelemetry.addData("Stream frames", pollenLocator.getStreamFramesSent());
         panelsTelemetry.addData("Pollen seen", pollen.size());
         for (int i = 0; i < pollen.size(); i++) {
             panelsTelemetry.addData("Pollen " + i, format(pollen.get(i)));
@@ -100,6 +107,7 @@ public class PollenTrackerTest extends NextOpMode {
 
     @Override
     public void end() {
+        PanelsCameraStream.INSTANCE.stopStream();
         pollenLocator.close();
         robot.stopImmediately();
     }
