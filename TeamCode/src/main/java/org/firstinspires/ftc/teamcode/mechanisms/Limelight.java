@@ -12,7 +12,6 @@ public class Limelight implements Mechanism {
 
     public void initialize(HardwareMap hardwareMap) {
         limelight = hardwareMap.tryGet(Limelight3A.class, "limelight");
-        // A missing camera or a different device type under this name returns null.
         if (limelight == null) return;
         limelight.setPollRateHz(50);
         limelight.start();

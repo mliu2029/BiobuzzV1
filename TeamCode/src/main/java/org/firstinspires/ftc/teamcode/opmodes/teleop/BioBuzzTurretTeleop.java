@@ -24,7 +24,8 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
     public static volatile boolean openTransfer = false;
 
     private final Alliance alliance;
-    private final TelemetryManager panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
+    private final TelemetryManager panelsTelemetry =
+        PanelsTelemetry.INSTANCE.getTelemetry();
     private double shooterPresetVelocity;
 
     protected BioBuzzTurretTeleop(Robot robot, Alliance alliance) {
@@ -49,13 +50,11 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         driver.dpadDown().onTrue(Commands.instant(() -> targetVelocity = 0));
         driver.dpadRight().onTrue(Commands.instant(() -> adjustVelocity(25)));
         driver.dpadLeft().onTrue(Commands.instant(() -> adjustVelocity(-25)));
-    }
-
-    @Override
-    protected void configureTransferControls(CommandGamepad driver) {
         driver.rightBumper().onTrue(Commands.instant(() -> openTransfer = true));
         driver.rightBumper().onFalse(Commands.instant(() -> openTransfer = false));
     }
+
+
 
     private void adjustVelocity(double change) {
         shooterPresetVelocity = Math.max(0,
@@ -102,13 +101,13 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         if (!started) return;
         robot.Shooter().setPIDFCoefficients(p, i, d, f);
         robot.Shooter().setVelocity(targetVelocity);
+        setTransferOpen(openTransfer);
         if (Double.isFinite(targetVelocity) && targetVelocity > 0) {
             shooterPresetVelocity = targetVelocity;
         }
         (runIntake
                 ? (reverseIntake ? robot.Intake().runIntakeReverse : robot.Intake().runIntake)
                 : robot.Intake().stopIntake).schedule();
-        (openTransfer ? robot.Transfer().openBlocker : robot.Transfer().closeBlocker).schedule();
         addControlTelemetry();
         telemetry.addData("Alliance", alliance);
         telemetry.addData("Aiming at: ", robot.Turret().getTarget());
@@ -131,9 +130,11 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
                 ? robot.Shooter().getTargetVelocity() : 0.0);
         panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Transfer().getRollerVelocity());
+        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Shooter().isEnabled()
+                ? robot.Shooter().getRollerTargetVelocity() : 0.0);
+        panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Shooter().getRollerVelocity());
         panelsTelemetry.addData("Flywheel Power", robot.Shooter().getFlywheelPower());
-        panelsTelemetry.addData("Roller Power", robot.Transfer().getRollerPower());
+        panelsTelemetry.addData("Roller Power", robot.Shooter().getRollerPower());
         panelsTelemetry.addData("Transfer Servo Position", robot.Transfer().getPosition());
         panelsTelemetry.addData("Shooter P", p);
         panelsTelemetry.addData("Shooter I", i);
@@ -153,7 +154,7 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         telemetry.addLine("Gamepad 1: right stick drives/strafes; left stick X turns.");
         telemetry.addLine("Gamepad 1: Circle intake; Square reverse; Cross stops intake.");
         telemetry.addLine("Gamepad 1: D-pad up/down starts/stops shooter; right/left changes speed by 25 rad/s.");
-        telemetry.addLine("Gamepad 1: Hold right bumper to open the blocker and run the transfer roller; release to stop both.");
+        telemetry.addLine("Gamepad 1: Hold right bumper to open transfer and run rollers at the shooter target speed; release to close and stop rollers.");
         telemetry.addLine("Panels > BioBuzzTurretTeleop: targetVelocity (0 stops), runIntake, reverseIntake, openTransfer, shooter p/i/d/f.");
         telemetry.addLine("Gamepad 2: Circle stops auto aim; D-pad up resumes it.");
     }

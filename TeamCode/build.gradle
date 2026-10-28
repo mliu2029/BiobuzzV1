@@ -56,7 +56,7 @@ dependencies {
     implementation 'com.skeletonarmyftc.marrow:core:1.2.2'
     implementation 'com.pedropathing:tuning:1.0.1'
     implementation 'com.pedropathing.ivy:pedro:1.1.1'
-    implementation 'com.bylazar:fullpanels:1.0.18'
+    implementation 'com.bylazar:fullpanels:1.0.19'
     testImplementation 'junit:junit:4.13.2'
     implementation 'dev.ftcautotune.FtcAutoTune:pidautotuner-core:v1.4.3'
     implementation 'dev.ftcautotune.FtcAutoTune:pidautotuner-ftc:v1.4.3'

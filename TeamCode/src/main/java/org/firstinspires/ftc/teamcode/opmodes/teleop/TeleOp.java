@@ -23,6 +23,7 @@
 package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
 import com.pedropathing.math.Pose;
+import com.pedropathing.ivy.commands.Commands;
 
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
@@ -35,11 +36,12 @@ public abstract class TeleOp extends NextOpMode {
     private static final int VELOCITY_STEP = 25;
     protected final Robot robot;
     protected boolean started;
+    private boolean transferOpen;
 
     protected TeleOp(Robot robot) {
         super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
-        telemetry.addData("Status", "Ready - press START");
+        telemetry.addData("Status", "Ready");
         telemetry.update();
     }
 
@@ -49,18 +51,12 @@ public abstract class TeleOp extends NextOpMode {
 
         configureMechanismControls(driver);
 
-        configureTransferControls(driver);
 
         //debug tools for gamepad 2
         driver2.dpadLeft().onTrue(robot.Drivetrain().relocalize());
     }
 
-    protected void configureTransferControls(CommandGamepad driver) {
-        driver.rightBumper().onTrue(robot.Transfer().openBlocker);
-        driver.rightBumper().onFalse(robot.Transfer().closeBlocker);
-    }
 
-    /** Override to keep tuning settings and gamepad mechanism controls in sync. */
     protected void configureMechanismControls(CommandGamepad driver) {
         driver.circle().onTrue(robot.Intake().runIntake);
         driver.square().onTrue(robot.Intake().runIntakeReverse);
@@ -70,12 +66,26 @@ public abstract class TeleOp extends NextOpMode {
                 () -> robot.Shooter().adjustVelocity(VELOCITY_STEP)));
         driver.dpadLeft().onTrue(robot.Shooter().instant(
                 () -> robot.Shooter().adjustVelocity(-VELOCITY_STEP)));
+        driver.rightBumper().onTrue(Commands.instant(() -> setTransferOpen(true))
+                .requiring(robot.Transfer(), robot.Shooter()));
+        driver.rightBumper().onFalse(Commands.instant(() -> setTransferOpen(false))
+                .requiring(robot.Transfer(), robot.Shooter()));
+    }
 
+    protected void setTransferOpen(boolean open) {
+        transferOpen = open;
+        if (open) {
+            robot.Transfer().openImmediately();
+        } else {
+            robot.Transfer().closeImmediately();
+        }
+        robot.Shooter().setRollerVelocity(open ? robot.Shooter().getTargetVelocity() : 0);
     }
 
     @Override
     public void start() {
         robot.initialize(hardwareMap);
+        setTransferOpen(false);
         configureControls();
         Pose startingPose = OpModeStorage.autonomousEndPose;
         robot.Drivetrain().getFollower().setPose(
@@ -88,9 +98,12 @@ public abstract class TeleOp extends NextOpMode {
     @Override
     public void periodic() {
         if (!started) return;
+        setTransferOpen(transferOpen);
         telemetry.addData("Shooter target (rad/s)", robot.Shooter().getTargetVelocity());
         telemetry.addData("Flywheel velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        telemetry.addData("Roller velocity (rad/s)", robot.Transfer().getRollerVelocity());
+        telemetry.addData("Roller target (rad/s)", robot.Shooter().isEnabled()
+                ? robot.Shooter().getRollerTargetVelocity() : 0.0);
+        telemetry.addData("Roller velocity (rad/s)", robot.Shooter().getRollerVelocity());
         telemetry.addData("Transfer servo position", robot.Transfer().getPosition());
         telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
         telemetry.update();
@@ -99,6 +112,7 @@ public abstract class TeleOp extends NextOpMode {
     @Override
     public void end() {
         started = false;
+        transferOpen = false;
         robot.stopImmediately();
     }
 }
