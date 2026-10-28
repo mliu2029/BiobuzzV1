@@ -26,6 +26,7 @@ public class redSolo2Tip extends NextOpMode {
 
     @Override
     public void start() {
+        OpModeStorage.autonomousEndTurretDegrees = 0.0;
         robot.initialize(hardwareMap);
         robot.Turret().initialize(hardwareMap, Alliance.RED);
         follower = robot.Drivetrain().getFollower();
@@ -51,6 +52,7 @@ public class redSolo2Tip extends NextOpMode {
         try {
             if (follower != null) {
                 OpModeStorage.autonomousEndPose = follower.pose();
+                OpModeStorage.saveAutonomousEndTurretDegrees(robot.Turret().getDegrees());
             }
         } finally {
             robot.stopImmediately();

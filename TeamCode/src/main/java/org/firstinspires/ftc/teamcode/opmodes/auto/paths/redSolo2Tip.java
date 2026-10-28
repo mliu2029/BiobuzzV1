@@ -7,19 +7,18 @@ import com.pedropathing.api.PoseFactory;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 
-/** Exported garden, two-flower, and park route for GardenAndFlowersAuto. */
+/** Exported garden, two-flower, and park route for Red Solo (2 Tip). */
 public class redSolo2Tip {
     private final PoseFactory poseFactory = PoseFactory.degrees();
 
-    public final Pose startPose = poseFactory.of(54.0964, 6.2233, 90);
-    // The export starts localization at 90 degrees and the first path at 180 degrees.
+    public final Pose startPose = poseFactory.of(54.0964, 6.2233, 180);
     private final Pose intakeGardenStart = poseFactory.of(54.0964, 6.2233, 180);
     private final Pose intakeGardenEnd = poseFactory.of(8.6641, 5.7964, 180);
     private final Pose shoot1End = poseFactory.of(58.878, 128.2045, 270);
     private final Pose shoot1Control = poseFactory.of(23.0036, 98.1166, 0);
-    private final Pose flowerPrep1End = poseFactory.of(47.7762, 123.7677, 90);
+    private final Pose flowerPrep1End = poseFactory.of(47.0165, 124.4471, 90);
     private final Pose flowerPrep1Control = poseFactory.of(51.4368, 113.8484, 0);
-    private final Pose flowerIntake1End = poseFactory.of(47.2381, 132.3215, 90);
+    private final Pose flowerIntake1End = poseFactory.of(46.8392, 128.1586, 90);
     private final Pose flowerPrep2End = poseFactory.of(23.4507, 47.1668, 180);
     private final Pose flowerIntake2End = poseFactory.of(11.583, 47.1973, 180);
     private final Pose shoot2End = poseFactory.of(56.8578, 128.996, 270);

@@ -47,6 +47,21 @@ public abstract class TeleOp extends NextOpMode {
         CommandGamepad driver = new CommandGamepad(gamepad1);
         CommandGamepad driver2=new CommandGamepad(gamepad2);
 
+        configureMechanismControls(driver);
+
+        configureTransferControls(driver);
+
+        //debug tools for gamepad 2
+        driver2.dpadLeft().onTrue(robot.Drivetrain().relocalize());
+    }
+
+    protected void configureTransferControls(CommandGamepad driver) {
+        driver.rightBumper().onTrue(robot.Transfer().openBlocker);
+        driver.rightBumper().onFalse(robot.Transfer().closeBlocker);
+    }
+
+    /** Override to keep tuning settings and gamepad mechanism controls in sync. */
+    protected void configureMechanismControls(CommandGamepad driver) {
         driver.circle().onTrue(robot.Intake().runIntake);
         driver.square().onTrue(robot.Intake().runIntakeReverse);
         driver.dpadUp().onTrue(robot.Shooter().runFlywheel);
@@ -56,12 +71,6 @@ public abstract class TeleOp extends NextOpMode {
         driver.dpadLeft().onTrue(robot.Shooter().instant(
                 () -> robot.Shooter().adjustVelocity(-VELOCITY_STEP)));
 
-         driver.rightBumper().onTrue(robot.Transfer().openBlocker);
-         driver.rightBumper().onFalse(robot.Transfer().closeBlocker);
-
-
-        //debug tools for gamepad 2
-        driver2.dpadLeft().onTrue(robot.Drivetrain().relocalize());
     }
 
     @Override
@@ -81,7 +90,8 @@ public abstract class TeleOp extends NextOpMode {
         if (!started) return;
         telemetry.addData("Shooter target (rad/s)", robot.Shooter().getTargetVelocity());
         telemetry.addData("Flywheel velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        telemetry.addData("Flywheel2 velocity (rad/s)", robot.Shooter().getRollerVelocity());
+        telemetry.addData("Roller velocity (rad/s)", robot.Transfer().getRollerVelocity());
+        telemetry.addData("Transfer servo position", robot.Transfer().getPosition());
         telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
         telemetry.update();
     }

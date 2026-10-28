@@ -22,7 +22,7 @@ public class Robot implements NextRobot {
     private final Ramp ramp =new Ramp();
 
     private final Set<Mechanism> mechanisms = Collections.unmodifiableSet(
-            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, limelight, turret,ramp)));
+            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, transfer, limelight, turret,ramp)));
 
     public Drivetrain Drivetrain() { return drivetrain; }
     public Intake Intake() { return intake; }
@@ -40,7 +40,8 @@ public class Robot implements NextRobot {
     public void initialize(HardwareMap hardwareMap) {
         drivetrain.initialize(hardwareMap);
         shooter.initialize();
-        intake.stopImmediately();
+        transfer.initialize();
+        intake.initialize();
         turret.stopImmediately();
     }
 
@@ -56,6 +57,7 @@ public class Robot implements NextRobot {
         drivetrain.stopImmediately();
         intake.stopImmediately();
         shooter.stopImmediately();
+        transfer.closeImmediately();
         turret.stopImmediately();
     }
 }

@@ -25,35 +25,35 @@ public class bluePartnerAuto {
     private final Pose point8 = poseFactory.of(129.8992, 46.2343, 270);
     private final Pose point8Control1 = poseFactory.of(132.5359, 72.0218, 0);
 
-    public Path path1() {
+    public Path flowerPrep1() {
         return curve(path1Start, path1Control1, path1).linear(path1Start, path1);
     }
 
-    public Path path2() {
+    public Path flowerIntake1() {
         return line(path1, point2).constant(point2);
     }
 
-    public Path path3() {
+    public Path gardenPrep() {
         return curve(point2, point3Control1, point3).linear(point2, point3);
     }
 
-    public Path path4() {
+    public Path intakeGarden() {
         return line(point3, point4).constant(point4);
     }
 
-    public Path path5() {
+    public Path flowerPrep2() {
         return curve(point4, point5Control1, point5).linear(point4, point5);
     }
 
-    public Path path6() {
+    public Path flowerIntake2() {
         return line(point5, point6).constant(point6);
     }
 
-    public Path path7() {
+    public Path shoot() {
         return line(point6, point7).linear(point6, point7);
     }
 
-    public Path path8() {
+    public Path park() {
         return curve(point7, point8Control1, point8).linear(point7, point8);
     }
 }

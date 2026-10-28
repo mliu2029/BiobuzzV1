@@ -28,11 +28,12 @@ public class Turret implements Mechanism {
     }
     private NextMotor turret;
     private DcMotorImplEx turretMotor;
-    private final PIDCoefficients gains = new PIDCoefficients(0, 0, 0);
+    private final PIDCoefficients gains = new PIDCoefficients(0.05, 0, 0.001);
     private final PIDController pid = new PIDController(gains);
     private HiveTarget target = HiveTarget.RED_CLOSE;
     private Alliance alliance;
     private boolean enabled;
+    private double startingDegrees;
     private double targetDegrees = Double.NaN;
     private double visionTimestamp = Double.NaN;
     private double visionDegrees = Double.NaN;
@@ -46,7 +47,12 @@ public class Turret implements Mechanism {
     public final Command stopTurret = instant(this::stopImmediately);
 
     public void initialize(HardwareMap hardwareMap, Alliance alliance) {
+        initialize(hardwareMap, alliance, 0.0);
+    }
+
+    public void initialize(HardwareMap hardwareMap, Alliance alliance, double startingDegrees) {
         this.alliance = Objects.requireNonNull(alliance, "Alliance is required");
+        this.startingDegrees = Double.isFinite(startingDegrees) ? startingDegrees : 0.0;
         turretMotor = hardwareMap.get(DcMotorImplEx.class, "turret");
         turretMotor.setPower(0);
         turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -187,7 +193,7 @@ public class Turret implements Mechanism {
 
     public double getDegrees() {
         return turretMotor == null || TurretConfig.ticksPerDegree == 0 ? Double.NaN
-                : turretMotor.getCurrentPosition() / TurretConfig.ticksPerDegree;
+                : startingDegrees + turretMotor.getCurrentPosition() / TurretConfig.ticksPerDegree;
     }
 
     public double getTargetDegrees() { return targetDegrees; }

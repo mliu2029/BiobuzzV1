@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.tests;
+package org.firstinspires.ftc.teamcode.opmodes.tests;
 
 import com.bylazar.camerastream.PanelsCameraStream;
 import com.bylazar.telemetry.PanelsTelemetry;
@@ -49,7 +49,7 @@ public class PollenTrackerTest extends NextOpMode {
 
     @Override
     public void start() {
-        follower = robot.getDrivetrain().getFollower();
+        follower = robot.Drivetrain().getFollower();
         Pose startingPose = OpModeStorage.autonomousEndPose;
         follower.setPose(startingPose != null ? startingPose : Pose.zero());
         follower.update();

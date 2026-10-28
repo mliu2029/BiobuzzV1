@@ -7,13 +7,14 @@ import dev.nextftc.robot.Mechanism;
 public class Intake implements Mechanism {
     private final NextMotor intake = new NextMotor("intake");
 
-    public Intake() {
+    public void initialize() {
+        // The SDK resets direction between OpModes, while NextFTC reuses this mechanism.
         intake.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         intake.setDirection(NextMotor.Direction.REVERSE);
-        // TODO: i have no fucking clue which direction this is supposed to be
+        stopImmediately();
     }
 
-    public final Command runIntake = setPower(1.0);
+    public final Command runIntake = setPower(0.8);
     public final Command runIntakeReverse = setPower(-1.0);
     public final Command stopIntake = setPower(0.0);
 
