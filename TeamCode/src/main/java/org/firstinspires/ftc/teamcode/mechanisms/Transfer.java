@@ -67,7 +67,7 @@ public class Transfer implements Mechanism {
         closeImmediately();
     }
 
-    public void setRollerVelocity(double velocity) {
+     public void setRollerVelocity(double velocity) {
         double target = Double.isFinite(velocity) ? Math.max(0, velocity) : 0;
         if (rollerTargetVelocity != target) roller.getVelocityPID().reset();
         rollerTargetVelocity = target;
