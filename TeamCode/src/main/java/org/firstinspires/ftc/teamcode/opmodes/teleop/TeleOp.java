@@ -67,19 +67,21 @@ public abstract class TeleOp extends NextOpMode {
         driver.dpadLeft().onTrue(robot.Shooter().instant(
                 () -> robot.Shooter().adjustVelocity(-VELOCITY_STEP)));
         driver.rightBumper().onTrue(Commands.instant(() -> setTransferOpen(true))
-                .requiring(robot.Transfer(), robot.Shooter()));
+                .requiring(robot.Transfer()));
         driver.rightBumper().onFalse(Commands.instant(() -> setTransferOpen(false))
-                .requiring(robot.Transfer(), robot.Shooter()));
+                .requiring(robot.Transfer()));
     }
 
     protected void setTransferOpen(boolean open) {
         transferOpen = open;
+        // Preserve TeleOp's shooter-enable interlock and matching feed speed.
+        robot.Transfer().setRollerVelocity(robot.Shooter().isEnabled()
+                ? robot.Shooter().getTargetVelocity() : 0);
         if (open) {
             robot.Transfer().openImmediately();
         } else {
             robot.Transfer().closeImmediately();
         }
-        robot.Shooter().setRollerVelocity(open ? robot.Shooter().getTargetVelocity() : 0);
     }
 
     @Override
@@ -101,9 +103,9 @@ public abstract class TeleOp extends NextOpMode {
         setTransferOpen(transferOpen);
         telemetry.addData("Shooter target (rad/s)", robot.Shooter().getTargetVelocity());
         telemetry.addData("Flywheel velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        telemetry.addData("Roller target (rad/s)", robot.Shooter().isEnabled()
-                ? robot.Shooter().getRollerTargetVelocity() : 0.0);
-        telemetry.addData("Roller velocity (rad/s)", robot.Shooter().getRollerVelocity());
+        telemetry.addData("Roller target (rad/s)", robot.Transfer().isFeeding()
+                ? robot.Transfer().getRollerTargetVelocity() : 0.0);
+        telemetry.addData("Roller velocity (rad/s)", robot.Transfer().getRollerVelocity());
         telemetry.addData("Transfer servo position", robot.Transfer().getPosition());
         telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
         telemetry.update();

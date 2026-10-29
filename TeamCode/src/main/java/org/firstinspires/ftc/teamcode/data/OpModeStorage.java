@@ -5,7 +5,7 @@ import com.pedropathing.math.Pose;
 public final class OpModeStorage {
     private OpModeStorage() { }
 
-    public static Pose autonomousEndPose = new Pose(8, 8, 0);
+    public static Pose autonomousEndPose = new Pose(70.75, 70.75, 90);
     public static double autonomousEndTurretDegrees = 0.0;
 
     public static void saveAutonomousEndTurretDegrees(double degrees) {

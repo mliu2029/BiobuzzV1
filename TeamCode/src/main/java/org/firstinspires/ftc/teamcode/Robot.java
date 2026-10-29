@@ -57,7 +57,7 @@ public class Robot implements NextRobot {
         drivetrain.stopImmediately();
         intake.stopImmediately();
         shooter.stopImmediately();
-        transfer.closeImmediately();
+        transfer.stopImmediately();
         turret.stopImmediately();
     }
 }

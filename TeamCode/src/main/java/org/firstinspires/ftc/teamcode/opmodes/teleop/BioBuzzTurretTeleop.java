@@ -130,11 +130,11 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
                 ? robot.Shooter().getTargetVelocity() : 0.0);
         panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Shooter().isEnabled()
-                ? robot.Shooter().getRollerTargetVelocity() : 0.0);
-        panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Shooter().getRollerVelocity());
+        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Transfer().isFeeding()
+                ? robot.Transfer().getRollerTargetVelocity() : 0.0);
+        panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Transfer().getRollerVelocity());
         panelsTelemetry.addData("Flywheel Power", robot.Shooter().getFlywheelPower());
-        panelsTelemetry.addData("Roller Power", robot.Shooter().getRollerPower());
+        panelsTelemetry.addData("Roller Power", robot.Transfer().getRollerPower());
         panelsTelemetry.addData("Transfer Servo Position", robot.Transfer().getPosition());
         panelsTelemetry.addData("Shooter P", p);
         panelsTelemetry.addData("Shooter I", i);

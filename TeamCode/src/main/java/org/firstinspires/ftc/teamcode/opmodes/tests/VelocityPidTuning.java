@@ -10,6 +10,7 @@ import java.util.Locale;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.mechanisms.Intake;
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter;
+import org.firstinspires.ftc.teamcode.mechanisms.Transfer;
 
 @Configurable
 @NextTeleop(name = "Velocity Tuning", group = "Tuning")
@@ -19,11 +20,11 @@ public class VelocityPidTuning extends NextOpMode {
     public static volatile double d = Shooter.DEFAULT_D;
     public static volatile double f = Shooter.DEFAULT_F;
     public static volatile double targetVelocity = 0.0;
-    public static volatile double rollerP = Shooter.DEFAULT_ROLLER_P;
-    public static volatile double rollerI = Shooter.DEFAULT_ROLLER_I;
-    public static volatile double rollerD = Shooter.DEFAULT_ROLLER_D;
-    public static volatile double rollerF = Shooter.DEFAULT_ROLLER_F;
-    public static volatile double rollerTargetVelocity = Shooter.DEFAULT_ROLLER_TARGET_VELOCITY;
+    public static volatile double rollerP = Transfer.DEFAULT_ROLLER_P;
+    public static volatile double rollerI = Transfer.DEFAULT_ROLLER_I;
+    public static volatile double rollerD = Transfer.DEFAULT_ROLLER_D;
+    public static volatile double rollerF = Transfer.DEFAULT_ROLLER_F;
+    public static volatile double rollerTargetVelocity = Transfer.DEFAULT_ROLLER_TARGET_VELOCITY;
     public static volatile double intakeP = Intake.DEFAULT_P;
     public static volatile double intakeI = Intake.DEFAULT_I;
     public static volatile double intakeD = Intake.DEFAULT_D;
@@ -58,23 +59,25 @@ public class VelocityPidTuning extends NextOpMode {
     public void periodic() {
         if (!started) return;
         robot.Shooter().setPIDFCoefficients(p, i, d, f);
-        robot.Shooter().setRollerPIDFCoefficients(rollerP, rollerI, rollerD, rollerF);
-        robot.Shooter().setRollerVelocity(rollerTargetVelocity);
+        robot.Transfer().setRollerPIDFCoefficients(rollerP, rollerI, rollerD, rollerF);
+        robot.Transfer().setRollerVelocity(rollerTargetVelocity);
 
         robot.Intake().setPIDFCoefficients(intakeP, intakeI, intakeD, intakeF);
         robot.Intake().setVelocity(runIntake ? intakeTargetVelocity : 0);
-        (openTransfer ? robot.Transfer().openBlocker : robot.Transfer().closeBlocker).schedule();
-        if(openTransfer)rollerTargetVelocity=1625;
-        if(!openTransfer)rollerTargetVelocity=0;
+        if (openTransfer) {
+            robot.Transfer().openImmediately();
+        } else {
+            robot.Transfer().closeImmediately();
+        }
         robot.Shooter().setVelocity(targetVelocity);
         panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
                 ? robot.Shooter().getTargetVelocity() : 0.0);
         panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Shooter().isEnabled()
-                ? robot.Shooter().getRollerTargetVelocity() : 0.0);
-        panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Shooter().getRollerVelocity());
+        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Transfer().isFeeding()
+                ? robot.Transfer().getRollerTargetVelocity() : 0.0);
+        panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Transfer().getRollerVelocity());
         panelsTelemetry.addData("Flywheel Power", robot.Shooter().getFlywheelPower());
-        panelsTelemetry.addData("Roller Power", robot.Shooter().getRollerPower());
+        panelsTelemetry.addData("Roller Power", robot.Transfer().getRollerPower());
         panelsTelemetry.addData("Intake Target Velocity (rad/s)", robot.Intake().getTargetVelocity());
         panelsTelemetry.addData("Intake Velocity (rad/s)", robot.Intake().getVelocity());
         panelsTelemetry.addData("Intake Power", robot.Intake().getPower());

@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.behaviors.EndCondition;
 import com.pedropathing.math.Pose;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
@@ -35,16 +36,51 @@ public class Turret implements Mechanism {
     private boolean enabled;
     private double startingDegrees;
     private double targetDegrees = Double.NaN;
+    private double fixedDegrees = Double.NaN;
     private double visionTimestamp = Double.NaN;
     private double visionDegrees = Double.NaN;
     private String mode = "OFF";
 
     public final Command aimTurret = instant(() -> {
+        fixedDegrees = Double.NaN;
+        targetDegrees = Double.NaN;
         enabled = true;
         clearVision();
         pid.reset();
     });
     public final Command stopTurret = instant(this::stopImmediately);
+
+    /**
+     * Moves to a robot-relative angle (positive is counterclockwise), then holds it.
+     * Waits until within toleranceDegrees (or cancelled) so an autonomous sequence can continue.
+     * Uses getDegrees()'s reference, including the starting angle passed to initialize().
+     * aimTurret resumes automatic aiming.
+     * Requires initialized hardware and calibrated limits; invalid targets are rejected.
+     */
+    public Command moveToDegrees(double degrees) {
+        if (!Double.isFinite(degrees)) {
+            throw new IllegalArgumentException("Turret angle must be finite");
+        }
+        return Command.build()
+                .requiring(this)
+                .setStart(() -> {
+                    stopImmediately();
+                    if (turret == null || !calibrated()) {
+                        throw new IllegalStateException("Initialize and calibrate the turret before moving it");
+                    }
+                    if (degrees < TurretConfig.minDegrees || degrees > TurretConfig.maxDegrees) {
+                        throw new IllegalArgumentException("Turret angle is outside the configured limits: " + degrees);
+                    }
+                    fixedDegrees = degrees;
+                    targetDegrees = degrees;
+                    mode = "POSITION";
+                    enabled = true;
+                })
+                .setDone(this::isAligned)
+                .setEnd(condition -> {
+                    if (condition != EndCondition.NATURALLY) stopImmediately();
+                });
+    }
 
     public void initialize(HardwareMap hardwareMap, Alliance alliance) {
         initialize(hardwareMap, alliance, 0.0);
@@ -68,6 +104,7 @@ public class Turret implements Mechanism {
         enabled = false;
         mode = "OFF";
         targetDegrees = Double.NaN;
+        fixedDegrees = Double.NaN;
         clearVision();
         pid.reset();
         applyPower(0);
@@ -88,20 +125,28 @@ public class Turret implements Mechanism {
             applyPower(0);
             return;
         }
-        Pose pose = drivetrain.getFollower().pose();
-        if (pose == null) { stopImmediately(); return; }
-        HiveTarget selected = alliance.targetForY(pose.y(), TurretConfig.halfwayY);
-        if (selected == null) { stopImmediately(); return; }
-        if (selected != target) {
-            target = selected;
-            clearVision();
-            pid.reset();
-        }
         double current = getDegrees();
-        double bearing = Calculations.bearing(pose.x(), pose.y(), pose.heading(), target);
-        targetDegrees = Calculations.reachableAngle(bearing, current,
-                TurretConfig.minDegrees, TurretConfig.maxDegrees);
-        mode = "ODOMETRY";
+        if (Double.isFinite(fixedDegrees)) {
+            // Fixed angles stay relative to the chassis, even as the robot drives.
+            if (fixedDegrees >= TurretConfig.minDegrees && fixedDegrees <= TurretConfig.maxDegrees) {
+                targetDegrees = fixedDegrees;
+            }
+            mode = "POSITION";
+        } else {
+            Pose pose = drivetrain.getFollower().pose();
+            if (pose == null) { stopImmediately(); return; }
+            HiveTarget selected = alliance.targetForY(pose.y(), TurretConfig.halfwayY);
+            if (selected == null) { stopImmediately(); return; }
+            if (selected != target) {
+                target = selected;
+                clearVision();
+                pid.reset();
+            }
+            double bearing = Calculations.bearing(pose.x(), pose.y(), pose.heading(), target);
+            targetDegrees = Calculations.reachableAngle(bearing, current,
+                    TurretConfig.minDegrees, TurretConfig.maxDegrees);
+            mode = "ODOMETRY";
+        }
         if (!Double.isFinite(targetDegrees)) {
             mode = "TARGET OUT OF RANGE / INVALID POSE";
             clearVision();
@@ -109,7 +154,7 @@ public class Turret implements Mechanism {
             applyPower(0);
             return;
         }
-        updateVision(current);
+        if (!Double.isFinite(fixedDegrees)) updateVision(current);
         double output = calculatePower(targetDegrees - current);
         if ((current <= TurretConfig.minDegrees && output * TurretConfig.ticksPerDegree < 0)
                 || (current >= TurretConfig.maxDegrees && output * TurretConfig.ticksPerDegree > 0)) {

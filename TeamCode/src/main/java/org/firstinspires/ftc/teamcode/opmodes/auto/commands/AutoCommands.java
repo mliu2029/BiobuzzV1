@@ -22,7 +22,7 @@ public class AutoCommands {
         return sequential(
                 Commands.instant(() -> status.accept("Starting")),
                 robot.Shooter().runFlywheel,
-                robot.Transfer().openBlocker,
+                robot.Transfer().feed,
                 robot.Ramp().up,
                 robot.Turret().aimTurret,
                 robot.Intake().runIntake
@@ -33,6 +33,14 @@ public class AutoCommands {
         return sequential(
                 Commands.instant(() -> status.accept(name)),
                 robot.Drivetrain().followPath(path)
+        );
+    }
+
+    /** Moves to a robot-relative angle and waits until aligned, then holds it. */
+    public Command moveTurret(double degrees) {
+        return sequential(
+                Commands.instant(() -> status.accept("Turret to " + degrees + " degrees")),
+                robot.Turret().moveToDegrees(degrees)
         );
     }
 
