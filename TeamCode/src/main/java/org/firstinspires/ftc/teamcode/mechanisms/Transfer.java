@@ -11,8 +11,8 @@ import dev.nextftc.units.Units;
 /** Owns the feeding rollers and blocker; the shooter flywheel runs independently. */
 @Configurable
 public class Transfer implements Mechanism {
-    public static volatile double openPosition = 0.2;
-    public static volatile double blockedPosition = 0.75;
+    public static volatile double openPosition = 0.13;
+    public static volatile double blockedPosition = 0.7;
 
     public static final double DEFAULT_ROLLER_P = 0.0001;
     public static final double DEFAULT_ROLLER_I = 0.0;

@@ -11,13 +11,13 @@ public final class TurretConfig {
     // goBILDA 1620 RPM Yellow Jacket: 28 counts/motor rev, exact internal ratio 1 + 46/17.
     // Existing external gearing: 24T motor gear driving the 90T turret gear.
     public static double ticksPerDegree = 28.0 * (1.0 + 46.0 / 17.0) * (90.0 / 24.0) / 360.0;
-    public static double minDegrees = 0;
-    public static double maxDegrees = 0;
-    public static double p = 0;
+    public static double minDegrees = -180;
+    public static double maxDegrees = 120;
+    public static double p = 0.07;
     public static double i = 0;
     public static double d = 0;
     public static double staticPower = 0;
-    public static double maxPower = 0.25;
+    public static double maxPower = 0.75;
     public static double toleranceDegrees = 2;
     public static double halfwayY = 70.75;
 
