@@ -114,6 +114,11 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         telemetry.addData("Aim mode", robot.Turret().getMode());
         telemetry.addData("Limelight", robot.Limelight().isAvailable()
                 ? "Configured" : "Unavailable (check USB/config)");
+        telemetry.addData("Vision status", robot.Turret().getVisionStatus());
+        telemetry.addData("Vision frame age (ms)", robot.Turret().getVisionFrameAgeMs());
+        telemetry.addData("Vision pipeline (-1=no result)", robot.Turret().getVisionPipeline());
+        telemetry.addData("Vision tag IDs", robot.Turret().getVisionTags());
+        telemetry.addData("Vision nearest tag error (deg)", robot.Turret().getVisionNearestErrorDegrees());
         telemetry.addData("Turret degrees", robot.Turret().getDegrees());
         telemetry.addData("Turret encoder ticks", robot.Turret().getEncoderTicks());
         telemetry.addData("Turret ticks/degree", TurretConfig.ticksPerDegree);
@@ -122,6 +127,12 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
         panelsTelemetry.addData("Alliance", alliance);
         panelsTelemetry.addData("Aim mode", robot.Turret().getMode());
+        panelsTelemetry.addData("Aiming at", robot.Turret().getTarget());
+        panelsTelemetry.addData("Vision status", robot.Turret().getVisionStatus());
+        panelsTelemetry.addData("Vision frame age (ms)", robot.Turret().getVisionFrameAgeMs());
+        panelsTelemetry.addData("Vision pipeline (-1=no result)", robot.Turret().getVisionPipeline());
+        panelsTelemetry.addData("Vision tag IDs", robot.Turret().getVisionTags());
+        panelsTelemetry.addData("Vision nearest tag error (deg)", robot.Turret().getVisionNearestErrorDegrees());
         panelsTelemetry.addData("Turret degrees", robot.Turret().getDegrees());
         panelsTelemetry.addData("Turret encoder ticks", robot.Turret().getEncoderTicks());
         panelsTelemetry.addData("Turret ticks/degree", TurretConfig.ticksPerDegree);

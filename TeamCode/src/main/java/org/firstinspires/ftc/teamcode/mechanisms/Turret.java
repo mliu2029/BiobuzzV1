@@ -40,6 +40,11 @@ public class Turret implements Mechanism {
     private double visionTimestamp = Double.NaN;
     private double visionDegrees = Double.NaN;
     private String mode = "OFF";
+    private String visionStatus = "Auto aim off";
+    private double visionFrameAgeMs = Double.NaN;
+    private int visionPipeline = -1;
+    private String visionTags = "[]";
+    private double visionNearestErrorDegrees = Double.NaN;
 
     public final Command aimTurret = instant(() -> {
         fixedDegrees = Double.NaN;
@@ -106,6 +111,7 @@ public class Turret implements Mechanism {
         targetDegrees = Double.NaN;
         fixedDegrees = Double.NaN;
         clearVision();
+        resetVisionDiagnostics("Auto aim off");
         pid.reset();
         applyPower(0);
     }
@@ -115,12 +121,22 @@ public class Turret implements Mechanism {
         visionDegrees = Double.NaN;
     }
 
+    private void resetVisionDiagnostics(String status) {
+        visionStatus = status;
+        visionFrameAgeMs = Double.NaN;
+        visionPipeline = -1;
+        visionTags = "[]";
+        visionNearestErrorDegrees = Double.NaN;
+    }
+
     @Override
     public void periodic() {
         if (turret == null) return;
+        resetVisionDiagnostics("Not evaluated");
         targetDegrees = Double.NaN;
         if (!enabled || !calibrated()) {
             mode = !enabled ? "OFF" : "CALIBRATION REQUIRED";
+            visionStatus = !enabled ? "Auto aim off" : "Turret calibration required";
             pid.reset();
             applyPower(0);
             return;
@@ -132,11 +148,20 @@ public class Turret implements Mechanism {
                 targetDegrees = fixedDegrees;
             }
             mode = "POSITION";
+            visionStatus = "Fixed angle command; auto aim inactive";
         } else {
             Pose pose = drivetrain.getFollower().pose();
-            if (pose == null) { stopImmediately(); return; }
+            if (pose == null) {
+                stopImmediately();
+                visionStatus = "No drivetrain pose";
+                return;
+            }
             HiveTarget selected = alliance.targetForY(pose.y(), TurretConfig.halfwayY);
-            if (selected == null) { stopImmediately(); return; }
+            if (selected == null) {
+                stopImmediately();
+                visionStatus = "Invalid pose / target selection";
+                return;
+            }
             if (selected != target) {
                 target = selected;
                 clearVision();
@@ -149,6 +174,7 @@ public class Turret implements Mechanism {
         }
         if (!Double.isFinite(targetDegrees)) {
             mode = "TARGET OUT OF RANGE / INVALID POSE";
+            visionStatus = "Odometry target unreachable; vision not evaluated";
             clearVision();
             pid.reset();
             applyPower(0);
@@ -176,22 +202,47 @@ public class Turret implements Mechanism {
 
     private void updateVision(double current) {
         if (!TurretConfig.useVision) {
+            visionStatus = "Disabled: useVision=false";
             clearVision();
             return;
         }
         LLResult result = limelight.getLatestResult();
-        if (result == null || !result.isValid() || result.getFiducialResults() == null) {
+        if (result == null) {
+            visionStatus = limelight.isAvailable() ? "No camera result"
+                    : "Camera unavailable; check USB/config";
             clearVision();
             return;
         }
 
         double age = result.getStaleness() + result.getCaptureLatency() + result.getTargetingLatency();
+        visionFrameAgeMs = age;
+        visionPipeline = result.getPipelineIndex();
+        StringBuilder tags = new StringBuilder("[");
+        if (result.getFiducialResults() != null) {
+            for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
+                if (tags.length() > 1) tags.append(", ");
+                tags.append(tag.getFiducialId());
+            }
+        }
+        visionTags = tags.append(']').toString();
+        if (!result.isValid() || result.getFiducialResults() == null) {
+            visionStatus = !result.isValid() ? "Camera result invalid / no target"
+                    : "No AprilTag results";
+            clearVision();
+            return;
+        }
         double sumError = 0;
         int accepted = 0;
+        int matching = 0;
         for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
             int id = tag.getFiducialId();
             if (!target.acceptsTag(id)) continue;
+            matching++;
             double txError = tag.getTargetXDegrees() - TurretConfig.desiredTx(target, id);
+            if (Double.isFinite(txError)) {
+                visionNearestErrorDegrees = Double.isNaN(visionNearestErrorDegrees)
+                        ? Math.abs(txError) : Math.min(visionNearestErrorDegrees, Math.abs(txError));
+            }
             if (!Calculations.usableVision(target, id,
                     result.getPipelineIndex(), TurretConfig.pipeline, age,
                     TurretConfig.maxFrameAgeMs, txError, TurretConfig.acquireDegrees)) continue;
@@ -199,6 +250,19 @@ public class Turret implements Mechanism {
             accepted++;
         }
         if (accepted == 0) {
+            if (visionPipeline != TurretConfig.pipeline) {
+                visionStatus = "Pipeline mismatch; expected " + TurretConfig.pipeline;
+            } else if (!Double.isFinite(age) || age < 0) {
+                visionStatus = "Invalid frame age";
+            } else if (age > TurretConfig.maxFrameAgeMs) {
+                visionStatus = "Frame too old; max " + TurretConfig.maxFrameAgeMs + " ms";
+            } else if (matching == 0) {
+                visionStatus = "No tags for " + target + "; expected "
+                        + target.firstTagId + ".." + (target.firstTagId + 3);
+            } else {
+                visionStatus = "Invalid tx/offset or outside acquisition window: "
+                        + TurretConfig.acquireDegrees + " deg";
+            }
             clearVision(); // Missing/wrong/stale tag falls back to odometry.
             return;
         }
@@ -213,7 +277,9 @@ public class Turret implements Mechanism {
         if (Double.isFinite(visionDegrees)) {
             targetDegrees = visionDegrees;
             mode = "LIMELIGHT";
+            visionStatus = "Tracking " + accepted + " tag(s)";
         } else {
+            visionStatus = "Vision target outside turret limits / invalid correction";
             clearVision();
         }
     }
@@ -244,6 +310,11 @@ public class Turret implements Mechanism {
     public double getTargetDegrees() { return targetDegrees; }
     public int getEncoderTicks() { return turretMotor == null ? 0 : turretMotor.getCurrentPosition(); }
     public String getMode() { return mode; }
+    public String getVisionStatus() { return visionStatus; }
+    public double getVisionFrameAgeMs() { return visionFrameAgeMs; }
+    public int getVisionPipeline() { return visionPipeline; }
+    public String getVisionTags() { return visionTags; }
+    public double getVisionNearestErrorDegrees() { return visionNearestErrorDegrees; }
     public HiveTarget getTarget() { return target; }
     public boolean isAligned() {
         return enabled && Double.isFinite(targetDegrees)
