@@ -36,13 +36,13 @@ public class blueSolo2Tip {
 
     public final Path gardenPrep;
     public final Path intakeGarden;
-    public final Path shoot1;
-    public final Path flowerPrep1;
-    public final Path flowerIntake1;
-    public final Path returnToShootFar;
-    public final Path flowerPrep2;
-    public final Path flowerIntake2;
-    public final Path shoot2;
+    //public final Path shoot1;
+    //public final Path flowerPrep1;
+    //public final Path flowerIntake1;
+    //public final Path returnToShootFar;
+    //public final Path flowerPrep2;
+    //public final Path flowerIntake2;
+    //public final Path shoot2;
     public final Path park;
 
     public blueSolo2Tip() {
@@ -50,20 +50,20 @@ public class blueSolo2Tip {
                 .linear(startPose, gardenPrepEnd);
         intakeGarden = Paths.line(gardenPrepEnd, intakeGardenEnd)
                 .constant(intakeGardenEnd);
-        shoot1 = Paths.curve(shoot1Start, shoot1Control, shoot1End)
-                .linear(shoot1Start, shoot1End);
-        flowerPrep1 = Paths.curve(flowerPrep1Start, flowerPrep1Control, flowerPrep1End)
-                .linear(flowerPrep1Start, flowerPrep1End);
-        flowerIntake1 = Paths.line(flowerPrep1End, flowerIntake1End)
-                .constant(flowerIntake1End);
-        returnToShootFar = Paths.line(returnToShootFarStart, returnToShootFarEnd)
-                .linear(returnToShootFarStart, returnToShootFarEnd);
-        flowerPrep2 = Paths.curve(flowerPrep2Start, flowerPrep2Control, flowerPrep2End)
-                .linear(flowerPrep2Start, flowerPrep2End);
-        flowerIntake2 = Paths.line(flowerPrep2End, flowerIntake2End)
-                .constant(flowerIntake2End);
-        shoot2 = Paths.curve(shoot2Start, shoot2Control, shoot2End)
-                .linear(shoot2Start, shoot2End);
+        //shoot1 = Paths.curve(shoot1Start, shoot1Control, shoot1End)
+                //.linear(shoot1Start, shoot1End);
+        //flowerPrep1 = Paths.curve(flowerPrep1Start, flowerPrep1Control, flowerPrep1End)
+                //.linear(flowerPrep1Start, flowerPrep1End);
+        //flowerIntake1 = Paths.line(flowerPrep1End, flowerIntake1End)
+                //.constant(flowerIntake1End);
+        //returnToShootFar = Paths.line(returnToShootFarStart, returnToShootFarEnd)
+                //.linear(returnToShootFarStart, returnToShootFarEnd);
+        //flowerPrep2 = Paths.curve(flowerPrep2Start, flowerPrep2Control, flowerPrep2End)
+                //.linear(flowerPrep2Start, flowerPrep2End);
+        //flowerIntake2 = Paths.line(flowerPrep2End, flowerIntake2End)
+                //.constant(flowerIntake2End);
+        //shoot2 = Paths.curve(shoot2Start, shoot2Control, shoot2End)
+                //.linear(shoot2Start, shoot2End);
         park = Paths.curve(parkStart, parkControl, parkEnd)
                 .linear(parkStart, parkEnd);
     }

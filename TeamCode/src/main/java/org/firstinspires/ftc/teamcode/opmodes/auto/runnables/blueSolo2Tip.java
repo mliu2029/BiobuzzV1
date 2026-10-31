@@ -10,7 +10,7 @@ import org.firstinspires.ftc.teamcode.data.OpModeStorage;
 import org.firstinspires.ftc.teamcode.opmodes.auto.commands.Routines;
 
 /** Runs the red solo sequence mirrored across both field centerlines. */
-@NextAutonomous(name = "Blue Solo (2 Tip)", group = "Pedro")
+@NextAutonomous(name = "Blue Solo ( Tip)", group = "Pedro")
 public class blueSolo2Tip extends NextOpMode {
     private final Robot robot;
     private Follower follower;
