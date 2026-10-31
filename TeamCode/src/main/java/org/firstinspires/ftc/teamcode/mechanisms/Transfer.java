@@ -13,6 +13,9 @@ import dev.nextftc.units.Units;
 public class Transfer implements Mechanism {
     public static volatile double openPosition = 0.13;
     public static volatile double blockedPosition = 0.7;
+    public static volatile boolean servoFreeMode = false;
+    /** Positive reverse-hold magnitude; the current default encoder scale makes this ticks/s. */
+    public static volatile double closedReverseVelocity = 500;
 
     public static final double DEFAULT_ROLLER_P = 0.0001;
     public static final double DEFAULT_ROLLER_I = 0.0;
@@ -22,12 +25,17 @@ public class Transfer implements Mechanism {
 
     private final NextServo transfer;
     private final NextMotor roller;
-    private boolean feeding;
+    private enum State { STOPPED, CLOSED, OPEN }
+    private State state = State.STOPPED;
+    private boolean initialized;
+    private boolean servoUsed;
+    private boolean servoDisabled;
     private boolean rollerGainsValid = true;
     private double rollerTargetVelocity = DEFAULT_ROLLER_TARGET_VELOCITY;
+    private double appliedRollerVelocity;
 
     public final Command feed = instant(this::openImmediately);
-    public final Command stopFeeding = instant(this::stopImmediately);
+    public final Command stopFeeding = instant(this::closeImmediately);
 
     public Transfer() {
         this(new NextServo("transfer"), new NextMotor("rollers"));
@@ -39,39 +47,51 @@ public class Transfer implements Mechanism {
     }
 
     public void initialize() {
-        transfer.setDirection(NextMotor.Direction.FORWARD);
+        initialized = false;
+        if (!servoFreeMode) transfer.setDirection(NextMotor.Direction.FORWARD);
         roller.setDirection(NextMotor.Direction.FORWARD);
         rollerTargetVelocity = DEFAULT_ROLLER_TARGET_VELOCITY;
         stopImmediately();
         rollerGainsValid = false;
         setRollerPIDFCoefficients(DEFAULT_ROLLER_P, DEFAULT_ROLLER_I,
                 DEFAULT_ROLLER_D, DEFAULT_ROLLER_F);
-        openImmediately();
+        initialized = true;
+        if (!servoFreeMode) openImmediately();
         closeImmediately();
     }
 
-    public double getPosition() { return transfer.getPosition(); }
+    public double getPosition() { return servoFreeMode ? Double.NaN : transfer.getPosition(); }
 
     public void openImmediately() {
-        transfer.setPosition(openPosition);
-        if (!feeding) roller.getVelocityPID().reset();
-        feeding = true;
-        updateRollerVelocity();
+        state = State.OPEN;
+        applyState();
     }
 
     public void closeImmediately() {
-        feeding = false;
-        stopRollerImmediately();
-        transfer.setPosition(blockedPosition);
+        state = State.CLOSED;
+        applyState();
     }
 
     public void stopImmediately() {
-        closeImmediately();
+        state = State.STOPPED;
+        stopRollerImmediately();
+        updateServo();
     }
 
-     public void setRollerVelocity(double velocity) {
+    /** Stop the rollers during INIT while leaving the blocker servo position alone. */
+    public void prepareForInit() {
+        initialized = false;
+        state = State.STOPPED;
+        stopRollerImmediately();
+    }
+
+    @Override
+    public void periodic() {
+        if (initialized) applyState();
+    }
+
+    public void setRollerVelocity(double velocity) {
         double target = Double.isFinite(velocity) ? Math.max(0, velocity) : 0;
-        if (rollerTargetVelocity != target) roller.getVelocityPID().reset();
         rollerTargetVelocity = target;
         updateRollerVelocity();
     }
@@ -98,7 +118,23 @@ public class Transfer implements Mechanism {
     }
 
     public boolean isFeeding() {
-        return feeding && rollerGainsValid && rollerTargetVelocity > 0;
+        return state == State.OPEN && rollerGainsValid && rollerTargetVelocity > 0;
+    }
+
+    /** Actual signed target, including reverse hold; STOP always returns zero. */
+    public double getCommandedRollerVelocity() {
+        if (!rollerGainsValid || state == State.STOPPED) return 0;
+        if (state == State.OPEN) return rollerTargetVelocity;
+        return servoFreeMode && Double.isFinite(closedReverseVelocity)
+                ? -Math.abs(closedReverseVelocity) : 0;
+    }
+
+    public String getStatus() {
+        if (state == State.STOPPED) return "Stopped";
+        if (!rollerGainsValid) return "Roller PIDF invalid";
+        if (state == State.OPEN) return isFeeding()
+                ? (servoFreeMode ? "Feeding (servo off)" : "Feeding") : "Open";
+        return getCommandedRollerVelocity() < 0 ? "Reverse hold (servo off)" : "Closed";
     }
 
     public double getRollerTargetVelocity() { return rollerTargetVelocity; }
@@ -106,14 +142,41 @@ public class Transfer implements Mechanism {
     public double getRollerPower() { return Math.max(-1, Math.min(1, roller.getThrottle())); }
 
     private void updateRollerVelocity() {
-        if (!isFeeding()) {
+        double velocity = getCommandedRollerVelocity();
+        if (velocity == 0) {
             stopRollerImmediately();
             return;
         }
-        roller.setVelocitySetpoint(Units.RadiansPerSecond.of(rollerTargetVelocity));
+        if (appliedRollerVelocity != velocity) roller.getVelocityPID().reset();
+        appliedRollerVelocity = velocity;
+        roller.setVelocitySetpoint(Units.RadiansPerSecond.of(velocity));
+    }
+
+    private void applyState() {
+        updateServo();
+        updateRollerVelocity();
+    }
+
+    private void updateServo() {
+        if (servoFreeMode) {
+            // Skip servo lookup entirely if this OpMode never used it. This also works
+            // with the broken servo removed from the robot configuration.
+            if (servoUsed && !servoDisabled) {
+                transfer.disable();
+                servoDisabled = true;
+            }
+            return;
+        }
+        if (servoDisabled) {
+            transfer.enable();
+            servoDisabled = false;
+        }
+        transfer.setPosition(state == State.OPEN ? openPosition : blockedPosition);
+        servoUsed = true;
     }
 
     private void stopRollerImmediately() {
+        appliedRollerVelocity = 0;
         roller.getVelocityPID().reset();
         roller.setThrottle(0);
         roller.update();

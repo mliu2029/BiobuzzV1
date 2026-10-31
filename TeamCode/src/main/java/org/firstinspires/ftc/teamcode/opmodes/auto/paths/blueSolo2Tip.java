@@ -30,9 +30,9 @@ public class blueSolo2Tip {
     private final Pose shoot2Start = poseFactory.of(11.495, 46.8662, 180);
     private final Pose shoot2End = poseFactory.of(56.8578, 128.996, 270);
     private final Pose shoot2Control = poseFactory.of(28.7152, 98.3556, 0);
-    private final Pose parkStart = poseFactory.of(56.8578, 128.996, 270);
-    private final Pose parkEnd = poseFactory.of(16.11, 92.19, 0);
-    private final Pose parkControl = poseFactory.of(43.35, 49.88, 0);
+    private final Pose parkStart = poseFactory.of(6.4821, 7.5665, 270);
+    private final Pose parkEnd = poseFactory.of(12.0657, 93.2373, 0);
+    private final Pose parkControl = poseFactory.of(38.6222, 56.7238, 0);
 
     public final Path gardenPrep;
     public final Path intakeGarden;

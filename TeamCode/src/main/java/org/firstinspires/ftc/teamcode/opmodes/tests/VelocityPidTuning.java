@@ -73,15 +73,16 @@ public class VelocityPidTuning extends NextOpMode {
         panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
                 ? robot.Shooter().getTargetVelocity() : 0.0);
         panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Transfer().isFeeding()
-                ? robot.Transfer().getRollerTargetVelocity() : 0.0);
+        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Transfer().getCommandedRollerVelocity());
         panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Transfer().getRollerVelocity());
         panelsTelemetry.addData("Flywheel Power", robot.Shooter().getFlywheelPower());
         panelsTelemetry.addData("Roller Power", robot.Transfer().getRollerPower());
         panelsTelemetry.addData("Intake Target Velocity (rad/s)", robot.Intake().getTargetVelocity());
         panelsTelemetry.addData("Intake Velocity (rad/s)", robot.Intake().getVelocity());
         panelsTelemetry.addData("Intake Power", robot.Intake().getPower());
-        panelsTelemetry.addData("Transfer Servo Position", robot.Transfer().getPosition());
+        panelsTelemetry.addData("Transfer", robot.Transfer().getStatus());
+        panelsTelemetry.addData("Transfer Servo Position", Transfer.servoFreeMode
+                ? "Disabled" : robot.Transfer().getPosition());
         panelsTelemetry.addLine(String.format(Locale.US,
                 "Shooter PIDF | P: %.5f, I: %.5f, D: %.5f, F: %.5f", p, i, d, f));
         panelsTelemetry.addLine(String.format(Locale.US,

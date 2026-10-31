@@ -1,7 +1,9 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.ivy.commands.Commands;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import dev.nextftc.robot.Mechanism;
@@ -35,6 +37,20 @@ public class Robot implements NextRobot {
     @Override
     public Set<Mechanism> getMechanisms() {
         return mechanisms;
+    }
+
+    /** Disarm a reused robot during INIT without commanding any servo positions. */
+    public void prepareForInit(HardwareMap hardwareMap) {
+        Scheduler.reset();
+        turret.stopImmediately();
+        drivetrain.stopImmediately();
+        shooter.stopImmediately();
+        intake.stopImmediately();
+        transfer.prepareForInit();
+        // Bypass output caches: an interrupted prior OpMode may have left stale outputs.
+        for (DcMotor motor : hardwareMap.getAll(DcMotor.class)) {
+            motor.setPower(0);
+        }
     }
 
     public void initialize(HardwareMap hardwareMap) {

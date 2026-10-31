@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode.opmodes.auto.commands;
 
 import static com.pedropathing.ivy.groups.Groups.sequential;
 
+import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap;
+
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.paths.Path;
@@ -20,7 +22,6 @@ public class AutoCommands {
         return sequential(
                 Commands.instant(() -> status.accept("Starting")),
                 robot.Shooter().runFlywheel,
-                robot.Transfer().feed,
                 robot.Ramp().up,
                 robot.Turret().aimTurret,
                 robot.Intake().runIntake
@@ -28,6 +29,8 @@ public class AutoCommands {
     }
     public Command shoot(){
         return sequential(
+                Commands.instant(() -> status.accept("Preparing to shoot")),
+                Commands.waitMs(1000),
                 Commands.instant(()->status.accept("Shooting")),
                 robot.Transfer().feed,
                 Commands.waitMs(1000),

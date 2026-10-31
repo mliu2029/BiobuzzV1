@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.behaviors.EndCondition;
 import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.ivy.pedro.PedroCommands;
 import com.pedropathing.math.Pose;
@@ -12,6 +13,8 @@ import dev.nextftc.robot.Mechanism;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 
 public class Drivetrain implements Mechanism {
+    private static final double PATH_TIMEOUT_MS = 5000;
+
     public Drivetrain() { }
     private Follower follower;
 
@@ -39,7 +42,14 @@ public class Drivetrain implements Mechanism {
     public Command followPath(Path path) {
         return PedroCommands.follow(follower, path)
                 .setDone(() -> follower.atParametricEnd() && !follower.isBusy())
-                .requiring(this);
+                .setEnd(condition -> {
+                    // A timeout interrupts this command; stop the old path before moving on.
+                    if (condition != EndCondition.NATURALLY) {
+                        stopImmediately();
+                    }
+                })
+                .requiring(this)
+                .raceWith(Commands.waitMs(PATH_TIMEOUT_MS));
     }
 
     public void stopImmediately() {

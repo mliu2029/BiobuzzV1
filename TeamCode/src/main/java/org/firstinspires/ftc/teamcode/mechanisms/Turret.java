@@ -367,6 +367,8 @@ public class Turret implements Mechanism {
     }
 
     public double getTargetDegrees() { return targetDegrees; }
+    public double getPower() { return turret == null ? 0 : turret.getThrottle(); }
+    public int getVisionTagId() { return visionTagId; }
     public int getEncoderTicks() { return turretMotor == null ? 0 : turretMotor.getCurrentPosition(); }
     public boolean isManualControl() { return manualControl; }
     public String getMode() { return mode; }

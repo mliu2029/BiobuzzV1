@@ -6,6 +6,9 @@ import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.commands.Commands;
 
 import java.util.function.Consumer;
+import org.firstinspires.ftc.teamcode.opmodes.auto.paths.Blue1Tip;
+import org.firstinspires.ftc.teamcode.opmodes.auto.paths.Red1Tip;
+import org.firstinspires.ftc.teamcode.opmodes.auto.paths.farPartnerAuto;
 import org.firstinspires.ftc.teamcode.opmodes.auto.paths.bluePartnerAuto;
 import org.firstinspires.ftc.teamcode.opmodes.auto.paths.blueSolo2Tip;
 import org.firstinspires.ftc.teamcode.opmodes.auto.paths.redPartnerAuto;
@@ -19,6 +22,37 @@ public class Routines {
     public Routines(Robot robot, Consumer<String> status) {
         this.robot = robot;
         commands = new AutoCommands(robot, status);
+    }
+
+    public Command red1Tip(Red1Tip paths) {
+        return sequential(
+                commands.init(),
+                commands.shoot(),
+                commands.followPath(paths.gardenPrep, "gardenPrep"),
+                commands.followPath(paths.intakeGarden, "intakeGarden"),
+                commands.followPath(paths.park, "park"),
+                commands.finish()
+        );
+    }
+
+    public Command blue1Tip(Blue1Tip paths) {
+        return sequential(
+                commands.init(),
+                commands.shoot(),
+                commands.followPath(paths.gardenPrep, "gardenPrep"),
+                commands.followPath(paths.intakeGarden, "intakeGarden"),
+                commands.followPath(paths.park, "park"),
+                commands.finish()
+        );
+    }
+
+    public Command farPartnerAuto(farPartnerAuto paths) {
+        return sequential(
+                commands.init(),
+                commands.shoot(),
+                commands.followPath(paths.path1(), "path1"),
+                commands.finish()
+        );
     }
 
     public Command bluePartnerAuto(bluePartnerAuto paths) {
