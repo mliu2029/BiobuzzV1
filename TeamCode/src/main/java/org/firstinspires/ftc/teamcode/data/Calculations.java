@@ -36,4 +36,14 @@ public final class  Calculations {
                 && Double.isFinite(ageMs) && ageMs >= 0 && ageMs <= maxAgeMs
                 && Double.isFinite(txError) && Math.abs(txError) <= acquireDegrees;
     }
+
+    /** Keep the tracked middle tag while usable; otherwise prefer the first middle tag. */
+    public static int selectVisionTag(HiveTarget target, int trackedId,
+                                      boolean firstUsable, boolean secondUsable) {
+        if (target == null) return -1;
+        if (trackedId == target.firstAimTagId && firstUsable) return trackedId;
+        if (trackedId == target.secondAimTagId && secondUsable) return trackedId;
+        if (firstUsable) return target.firstAimTagId;
+        return secondUsable ? target.secondAimTagId : -1;
+    }
 }

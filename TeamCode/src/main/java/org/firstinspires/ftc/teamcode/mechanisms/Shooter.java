@@ -93,6 +93,11 @@ public class Shooter implements Mechanism {
 
     public boolean isEnabled() { return enabled; }
 
+    public String getControlStatus() {
+        if (!velocityGainsValid) return "INVALID PIDF";
+        return enabled ? "VELOCITY CONTROL" : "STOPPED";
+    }
+
     public void stopImmediately() {
         enabled = false;
         resetControllers();

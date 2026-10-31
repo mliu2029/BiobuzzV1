@@ -7,8 +7,6 @@ import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.paths.Path;
 import java.util.function.Consumer;
 import org.firstinspires.ftc.teamcode.Robot;
-
-/** Reusable autonomous actions using the OpMode's existing robot. */
 public class AutoCommands {
     private final Robot robot;
     private final Consumer<String> status;
@@ -28,7 +26,16 @@ public class AutoCommands {
                 robot.Intake().runIntake
         );
     }
+    public Command shoot(){
+        return sequential(
+                Commands.instant(()->status.accept("Shooting")),
+                robot.Transfer().feed,
+                Commands.waitMs(1000),
+                robot.Transfer().stopFeeding
 
+        );
+
+    }
     public Command followPath(Path path, String name) {
         return sequential(
                 Commands.instant(() -> status.accept(name)),
@@ -36,7 +43,6 @@ public class AutoCommands {
         );
     }
 
-    /** Moves to a robot-relative angle and waits until aligned, then holds it. */
     public Command moveTurret(double degrees) {
         return sequential(
                 Commands.instant(() -> status.accept("Turret to " + degrees + " degrees")),

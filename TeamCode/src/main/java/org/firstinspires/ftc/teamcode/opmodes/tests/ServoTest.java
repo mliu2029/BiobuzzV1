@@ -34,9 +34,9 @@ public class ServoTest extends OpMode {
         rampDown = false;
         runIntake = false;
         panelsTelemetry.setUpdateInterval(50);
-        panelsTelemetry.addLine("After START: tune position, ramp1Position, and ramp2Position.");
-        panelsTelemetry.addLine("Set rampUp or rampDown true to move both ramps using the Ramp presets.");
-        panelsTelemetry.addLine("runIntake runs/stops the intake; intakePower sets its power (0..1).");
+//        panelsTelemetry.addLine("After START: tune position, ramp1Position, and ramp2Position.");
+//        panelsTelemetry.addLine("Set rampUp or rampDown true to move both ramps using the Ramp presets.");
+//        panelsTelemetry.addLine("runIntake runs/stops the intake; intakePower sets its power (0..1).");
         panelsTelemetry.update(telemetry);
     }
 
