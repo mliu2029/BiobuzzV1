@@ -7,11 +7,11 @@ import dev.nextftc.robot.Mechanism;
 import dev.nextftc.units.Units;
 
 public class Intake implements Mechanism {
-    public static final double DEFAULT_P = 0.0000001;
+    public static final double DEFAULT_P = 0.000001;
     public static final double DEFAULT_I = 0.0;
     public static final double DEFAULT_D = 0.0;
-    public static final double DEFAULT_F = 0.000299;
-    public static final double DEFAULT_TARGET_VELOCITY = 2750;
+    public static final double DEFAULT_F = 0.000323;
+    public static final double DEFAULT_TARGET_VELOCITY = 2500;
 
     private final NextMotor intake;
     private boolean enabled;

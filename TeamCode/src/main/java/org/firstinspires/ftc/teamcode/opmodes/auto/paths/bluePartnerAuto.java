@@ -1,59 +1,85 @@
 package org.firstinspires.ftc.teamcode.opmodes.auto.paths;
 
-import static com.pedropathing.api.Paths.*;
+import static com.pedropathing.api.Paths.curve;
+import static com.pedropathing.api.Paths.line;
 
 import com.pedropathing.api.PoseFactory;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 
+/** Imported from farBluePartnerAuto.pp; segment order follows the visualizer sequence. */
 public class bluePartnerAuto {
-
     private final PoseFactory poseFactory = PoseFactory.degrees();
 
-    public final Pose startPose = poseFactory.of(77.5077, 7.6213, 270);
-    private final Pose path1Start = poseFactory.of(77.5077, 7.6213, 90);
-    private final Pose path1 = poseFactory.of(94.2189, 21.5809, 270);
-    private final Pose path1Control1 = poseFactory.of(85.2266, 31.3434, 0);
-    private final Pose point2 = poseFactory.of(94.2606, 12.181, 270);
-    private final Pose point3 = poseFactory.of(91.1765, 135.5109, 0);
-    private final Pose point3Control1 = poseFactory.of(71.2323, 67.5366, 0);
-    private final Pose point4 = poseFactory.of(133.3774, 135.3716, 0);
-    private final Pose point5 = poseFactory.of(126.3328, 94.4204, 0);
-    private final Pose point5Control1 = poseFactory.of(113.2741, 110.7959, 0);
-    private final Pose point6 = poseFactory.of(129.8209, 94.3774, 0);
-    private final Pose point7 = poseFactory.of(87.6431, 133.6277, 270);
-    private final Pose point8 = poseFactory.of(129.8992, 46.2343, 270);
-    private final Pose point8Control1 = poseFactory.of(132.5359, 72.0218, 0);
+    public final Pose startPose = poseFactory.of(80.9589216944801, 7.984595635430026, 270);
+    // Preserve the exported heading discontinuity at this segment boundary.
+    private final Pose PrepFlowerIntake1Start = poseFactory.of(80.9589216944801, 7.984595635430026, 90);
+    private final Pose PrepFlowerIntake1Control = poseFactory.of(89.75, 21.75, 0);
+    private final Pose PrepFlowerIntake1End = poseFactory.of(94.75, 21.75, 270);
+    private final Pose FlowerIntake1End = poseFactory.of(94.75, 11.75, 270);
+    private final Pose returnToShootFarControl = poseFactory.of(89.75, 21.75, 0);
+    private final Pose returnToShootFarEnd = poseFactory.of(82.75, 8.75, 90);
+    private final Pose PrepFlowerIntake2Control = poseFactory.of(119.46189244210595, 41.58902627554113, 0);
+    private final Pose PrepFlowerIntake2End = poseFactory.of(118.75, 94.75, 0);
+    private final Pose FlowerIntake2End = poseFactory.of(130.75, 94.75, 0);
+    private final Pose shootClose1End = poseFactory.of(84.67513638616379, 132.93392235824453, 270);
+    private final Pose prepGardenIntakeControl = poseFactory.of(107.63953124755766, 113.14213253814779, 0);
+    private final Pose prepGardenIntakeEnd = poseFactory.of(134.03486712056406, 126.53000478457851, 90);
+    private final Pose gardenIntakeEnd = poseFactory.of(134.73335664086218, 133.63371630633384, 90);
+    private final Pose shootClose2End = poseFactory.of(84.79629728319824, 133.2024124991269, 270);
+    private final Pose parkControl = poseFactory.of(132.20147512590748, 78.92310919930526, 0);
+    private final Pose parkEnd = poseFactory.of(129.70372857865854, 46.73481418000674, 180);
 
-    public Path flowerPrep1() {
-        return curve(path1Start, path1Control1, path1).linear(path1Start, path1);
+    public Path PrepFlowerIntake1() {
+        // Match the visualizer's counterclockwise half-turn.
+        return curve(PrepFlowerIntake1Start, PrepFlowerIntake1Control, PrepFlowerIntake1End)
+                .heading((ignored, progress) -> PrepFlowerIntake1Start.heading() + Math.PI * progress);
     }
 
-    public Path flowerIntake1() {
-        return line(path1, point2).constant(point2);
+    public Path FlowerIntake1() {
+        return line(PrepFlowerIntake1End, FlowerIntake1End)
+                .constant(FlowerIntake1End);
     }
 
-    public Path gardenPrep() {
-        return curve(point2, point3Control1, point3).linear(point2, point3);
+    public Path returnToShootFar() {
+        return curve(FlowerIntake1End, returnToShootFarControl, returnToShootFarEnd)
+                .linear(FlowerIntake1End, returnToShootFarEnd);
     }
 
-    public Path intakeGarden() {
-        return line(point3, point4).constant(point4);
+    public Path PrepFlowerIntake2() {
+        return curve(returnToShootFarEnd, PrepFlowerIntake2Control, PrepFlowerIntake2End)
+                .linear(returnToShootFarEnd, PrepFlowerIntake2End);
     }
 
-    public Path flowerPrep2() {
-        return curve(point4, point5Control1, point5).linear(point4, point5);
+    public Path FlowerIntake2() {
+        return line(PrepFlowerIntake2End, FlowerIntake2End)
+                .constant(FlowerIntake2End);
     }
 
-    public Path flowerIntake2() {
-        return line(point5, point6).constant(point6);
+    public Path shootClose1() {
+        return line(FlowerIntake2End, shootClose1End)
+                .linear(FlowerIntake2End, shootClose1End);
     }
 
-    public Path shoot() {
-        return line(point6, point7).linear(point6, point7);
+    public Path prepGardenIntake() {
+        return curve(shootClose1End, prepGardenIntakeControl, prepGardenIntakeEnd)
+                .linear(shootClose1End, prepGardenIntakeEnd);
+    }
+
+    public Path gardenIntake() {
+        return line(prepGardenIntakeEnd, gardenIntakeEnd)
+                .constant(gardenIntakeEnd);
+    }
+
+    public Path shootClose2() {
+        // Match the visualizer's counterclockwise half-turn.
+        return line(gardenIntakeEnd, shootClose2End)
+                .heading((ignored, progress) -> gardenIntakeEnd.heading() + Math.PI * progress);
     }
 
     public Path park() {
-        return curve(point7, point8Control1, point8).linear(point7, point8);
+        return curve(shootClose2End, parkControl, parkEnd)
+                .linear(shootClose2End, parkEnd);
     }
+
 }

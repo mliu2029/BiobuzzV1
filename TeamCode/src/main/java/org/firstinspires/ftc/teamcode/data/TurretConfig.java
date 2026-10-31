@@ -11,27 +11,27 @@ public final class TurretConfig {
     // goBILDA 1620 RPM Yellow Jacket: 28 counts/motor rev, exact internal ratio 1 + 46/17.
     // Existing external gearing: 24T motor gear driving the 90T turret gear.
     public static double ticksPerDegree = 28.0 * (1.0 + 46.0 / 17.0) * (90.0 / 24.0) / 360.0;
-    public static double minDegrees = -180;
-    public static double maxDegrees = 120;
-    public static double p = 0.07;
+    public static double minDegrees = -70;
+    public static double maxDegrees = 70;
+    public static double p = 0.01;
     public static double i = 0;
-    public static double d = 0;
+    public static double d = 0.001;
     public static double staticPower = 0;
     public static double maxPower = 0.75;
+    public static double manualPower = 0.4;
     public static double toleranceDegrees = 2;
-    public static double halfwayY = 70.75;
-
-    public static boolean useVision = false;
     public static int pipeline = 0;
     // Desired tx for each tag in ascending ID order, when aimed at the opening.
-    // Distinct tag offsets prevent a partial cluster from changing the aim point.
+    // Zero offsets aim at the center of the selected tag.
+    // Keep all four slots; aiming tracks one of the middle two IDs at a time.
     public static double[] redCloseTx = {0, 0, 0, 0}; // 34..37
     public static double[] blueCloseTx = {0, 0, 0, 0}; // 38..41
     public static double[] redFarTx = {0, 0, 0, 0}; // 30..33
     public static double[] blueFarTx = {0, 0, 0, 0}; // 42..45
     // Normally a tag to the camera's right requires clockwise (negative CCW) motion.
     public static double txToCcwSign = -1;
-    public static double acquireDegrees = 10;
+    // Camera-only aiming can acquire visible tags without an odometry handoff window.
+    public static double acquireDegrees = 90;
     public static double maxFrameAgeMs = 100;
 
     public static double desiredTx(HiveTarget target, int tagId) {

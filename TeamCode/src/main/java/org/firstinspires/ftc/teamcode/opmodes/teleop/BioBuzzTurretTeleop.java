@@ -4,16 +4,19 @@ import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.pedropathing.ivy.commands.Commands;
+import com.pedropathing.math.Pose;
+import dev.nextftc.robot.opmode.BulkReadHook;
+import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
 import org.firstinspires.ftc.teamcode.data.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.data.Alliance;
-import org.firstinspires.ftc.teamcode.data.TurretConfig;
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter;
+import java.util.Locale;
 
-/** Alliance turret test with automatic aiming and the standard gamepad 1 drivetrain controls. */
+/** Shared main TeleOp for red and blue, with driving and Limelight turret aiming. */
 @Configurable
-public abstract class BioBuzzTurretTeleop extends TeleOp {
+public abstract class BioBuzzTurretTeleop extends NextOpMode {
     public static volatile double p = Shooter.DEFAULT_P;
     public static volatile double i = Shooter.DEFAULT_I;
     public static volatile double d = Shooter.DEFAULT_D;
@@ -23,20 +26,25 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
     public static volatile boolean reverseIntake = false;
     public static volatile boolean openTransfer = false;
 
+    private final Robot robot;
     private final Alliance alliance;
+    private boolean started;
     private final TelemetryManager panelsTelemetry =
         PanelsTelemetry.INSTANCE.getTelemetry();
     private double shooterPresetVelocity;
 
     protected BioBuzzTurretTeleop(Robot robot, Alliance alliance) {
-        super(robot);
+        super(robot, BulkReadHook.INSTANCE);
+        this.robot = robot;
         this.alliance = alliance;
         resetMechanismControls();
         panelsTelemetry.setUpdateInterval(50);
+        telemetry.addData("Status", "Ready");
+        telemetry.update();
     }
 
-    @Override
-    protected void configureMechanismControls(CommandGamepad driver) {
+    private void configureControls() {
+        CommandGamepad driver = new CommandGamepad(gamepad1);
         driver.circle().onTrue(Commands.instant(() -> {
             reverseIntake = false;
             runIntake = true;
@@ -47,15 +55,28 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         }));
         driver.cross().onTrue(Commands.instant(() -> runIntake = false));
         driver.dpadUp().onTrue(Commands.instant(() -> targetVelocity = shooterPresetVelocity));
-        driver.dpadDown().onTrue(Commands.instant(() -> targetVelocity = 0));
+
         driver.dpadRight().onTrue(Commands.instant(() -> adjustVelocity(25)));
         driver.dpadLeft().onTrue(Commands.instant(() -> adjustVelocity(-25)));
         driver.rightBumper().onTrue(Commands.instant(() -> openTransfer = true));
         driver.rightBumper().onFalse(Commands.instant(() -> openTransfer = false));
+
+        CommandGamepad driver2 = new CommandGamepad(gamepad2);
+        driver2.triangle().onTrue(Commands.instant(() -> runIntake = false));
+        driver2.square().onTrue(Commands.instant(robot.Turret()::toggleManualRecenter));
+        driver2.dpadUp().onTrue(robot.Turret().aimTurret);
+        driver2.circle().onTrue(robot.Turret().stopTurret);
+        driver2.dpadDown().onTrue(Commands.instant(() -> targetVelocity = 0));
     }
 
-
-
+    private void setTransferOpen(boolean open) {
+        robot.Transfer().setRollerVelocity(900);
+        if (open) {
+            robot.Transfer().openImmediately();
+        } else {
+            robot.Transfer().closeImmediately();
+        }
+    }
     private void adjustVelocity(double change) {
         shooterPresetVelocity = Math.max(0,
                 (targetVelocity > 0 ? targetVelocity : shooterPresetVelocity) + change);
@@ -71,34 +92,35 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
 
     @Override
     public void disabledPeriodic() {
-        telemetry.addLine("START restores the turret angle saved by auto; otherwise starts at 0 degrees.");
-        addControlTelemetry();
-        telemetry.addLine("PLAY starts driving and automatic turret aiming.");
-        telemetry.addData("TeleOp starting pose", OpModeStorage.autonomousEndPose);
-        telemetry.addData("TeleOp starting turret (degrees)", OpModeStorage.autonomousEndTurretDegrees);
+        telemetry.addData("Status", "Ready");
         telemetry.addData("Alliance", alliance);
-        telemetry.addData("Limelight", "Not initialized until START");
         telemetry.update();
     }
 
     @Override
     public void start() {
-        super.start(); // Restore the pose and start continuous gamepad 1 driving.
+        robot.initialize(hardwareMap);
         shooterPresetVelocity = robot.Shooter().getTargetVelocity();
         runIntake = false;
         reverseIntake = false;
         openTransfer = false;
+        setTransferOpen(false);
+        Pose startingPose = OpModeStorage.autonomousEndPose;
+        robot.Drivetrain().getFollower().setPose(
+                startingPose != null ? startingPose : Pose.zero());
+        robot.Drivetrain().getFollower().update();
         robot.Turret().initialize(hardwareMap, alliance,
                 OpModeStorage.consumeAutonomousEndTurretDegrees());
-        CommandGamepad operator = new CommandGamepad(gamepad2);
-        operator.dpadUp().onTrue(robot.Turret().aimTurret);
-        operator.circle().onTrue(robot.Turret().stopTurret);
+        configureControls();
+        robot.startDrive(gamepad1);
+        started = true;
         robot.Turret().aimTurret.schedule();
     }
 
     @Override
     public void periodic() {
         if (!started) return;
+        robot.Turret().setManualInput(gamepad2.left_bumper, gamepad2.right_bumper);
         robot.Shooter().setPIDFCoefficients(p, i, d, f);
         robot.Shooter().setVelocity(targetVelocity);
         setTransferOpen(openTransfer);
@@ -108,56 +130,34 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         (runIntake
                 ? (reverseIntake ? robot.Intake().runIntakeReverse : robot.Intake().runIntake)
                 : robot.Intake().stopIntake).schedule();
-        addControlTelemetry();
-        telemetry.addData("Alliance", alliance);
-        telemetry.addData("Aiming at: ", robot.Turret().getTarget());
-        telemetry.addData("Aim mode", robot.Turret().getMode());
-        telemetry.addData("Vision", robot.Turret().getVisionStatus());
-        telemetry.addData("Limelight", robot.Limelight().isAvailable()
-                ? "Configured" : "Unavailable (check USB/config)");
-        telemetry.addData("Turret degrees", robot.Turret().getDegrees());
-        telemetry.addData("Turret encoder ticks", robot.Turret().getEncoderTicks());
-        telemetry.addData("Turret ticks/degree", TurretConfig.ticksPerDegree);
-        telemetry.addData("Target degrees", robot.Turret().getTargetDegrees());
-        telemetry.addData("Aligned: ", robot.Turret().isAligned());
-        telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
-        panelsTelemetry.addData("Alliance", alliance);
-        panelsTelemetry.addData("Aim mode", robot.Turret().getMode());
-        panelsTelemetry.addData("Vision", robot.Turret().getVisionStatus());
-        panelsTelemetry.addData("Turret degrees", robot.Turret().getDegrees());
-        panelsTelemetry.addData("Turret encoder ticks", robot.Turret().getEncoderTicks());
-        panelsTelemetry.addData("Turret ticks/degree", TurretConfig.ticksPerDegree);
-        panelsTelemetry.addData("Target degrees", robot.Turret().getTargetDegrees());
-        panelsTelemetry.addData("Intake", runIntake ? (reverseIntake ? "Reverse" : "On") : "Off");
-        panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
-                ? robot.Shooter().getTargetVelocity() : 0.0);
-        panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
-        panelsTelemetry.addData("Roller Target Velocity (rad/s)", robot.Transfer().isFeeding()
-                ? robot.Transfer().getRollerTargetVelocity() : 0.0);
-        panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Transfer().getRollerVelocity());
-        panelsTelemetry.addData("Flywheel Power", robot.Shooter().getFlywheelPower());
-        panelsTelemetry.addData("Roller Power", robot.Transfer().getRollerPower());
-        panelsTelemetry.addData("Transfer Servo Position", robot.Transfer().getPosition());
-        panelsTelemetry.addData("Shooter P", p);
-        panelsTelemetry.addData("Shooter I", i);
-        panelsTelemetry.addData("Shooter D", d);
-        panelsTelemetry.addData("Shooter F", f);
+        updateDriverTelemetry();
+    }
+
+    private void updateDriverTelemetry() {
+        addDriverData("Alliance", alliance);
+        addDriverData("Aim", robot.Turret().getMode());
+        addDriverData("Vision", robot.Turret().getVisionStatus());
+        addDriverData("Turret (deg)", String.format(Locale.US, "%.1f", robot.Turret().getDegrees()));
+        addDriverData("Aligned", robot.Turret().isAligned() ? "Yes" : "No");
+        addDriverData("Shooter (actual / target)", String.format(Locale.US, "%.0f / %.0f rad/s",
+                robot.Shooter().getFlywheelVelocity(), robot.Shooter().getTargetVelocity()));
+        addDriverData("Intake", runIntake ? (reverseIntake ? "Reverse" : "On") : "Off");
+        addDriverData("Transfer", robot.Transfer().isFeeding() ? "Feeding"
+                : openTransfer ? "Open" : "Closed");
         panelsTelemetry.update();
-        super.periodic();
+        telemetry.update();
+    }
+
+    private void addDriverData(String caption, Object value) {
+        telemetry.addData(caption, value);
+        panelsTelemetry.addData(caption, value);
     }
 
     @Override
     public void end() {
+        started = false;
         resetMechanismControls();
-        super.end();
+        robot.stopImmediately();
     }
 
-    private void addControlTelemetry() {
-        telemetry.addLine("Gamepad 1: right stick drives/strafes; left stick X turns.");
-        telemetry.addLine("Gamepad 1: Circle intake; Square reverse; Cross stops intake.");
-        telemetry.addLine("Gamepad 1: D-pad up/down starts/stops shooter; right/left changes speed by 25 rad/s.");
-        telemetry.addLine("Gamepad 1: Hold right bumper to open transfer and run rollers at the shooter target speed; release to close and stop rollers.");
-        telemetry.addLine("Panels > BioBuzzTurretTeleop: targetVelocity (0 stops), runIntake, reverseIntake, openTransfer, shooter p/i/d/f.");
-        telemetry.addLine("Gamepad 2: Circle stops auto aim; D-pad up resumes it.");
-    }
 }

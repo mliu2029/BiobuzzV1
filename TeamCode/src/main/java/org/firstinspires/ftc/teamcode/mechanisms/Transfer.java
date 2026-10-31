@@ -18,7 +18,7 @@ public class Transfer implements Mechanism {
     public static final double DEFAULT_ROLLER_I = 0.0;
     public static final double DEFAULT_ROLLER_D = 0.0;
     public static final double DEFAULT_ROLLER_F = 0.0004279;
-    public static final double DEFAULT_ROLLER_TARGET_VELOCITY = 1625;
+    public static final double DEFAULT_ROLLER_TARGET_VELOCITY = 1200;
 
     private final NextServo transfer;
     private final NextMotor roller;
@@ -46,6 +46,8 @@ public class Transfer implements Mechanism {
         rollerGainsValid = false;
         setRollerPIDFCoefficients(DEFAULT_ROLLER_P, DEFAULT_ROLLER_I,
                 DEFAULT_ROLLER_D, DEFAULT_ROLLER_F);
+        openImmediately();
+        closeImmediately();
     }
 
     public double getPosition() { return transfer.getPosition(); }

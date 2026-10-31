@@ -17,7 +17,7 @@ public class Robot implements NextRobot {
     private final Intake intake = new Intake();
     private final Shooter shooter = new Shooter();
     private final Limelight limelight = new Limelight();
-    private final Turret turret = new Turret(drivetrain, limelight);
+    private final Turret turret = new Turret(limelight);
     private final Transfer transfer = new Transfer();
     private final Ramp ramp =new Ramp();
 

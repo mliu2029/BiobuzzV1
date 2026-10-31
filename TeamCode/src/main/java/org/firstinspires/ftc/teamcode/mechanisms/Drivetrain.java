@@ -27,7 +27,7 @@ public class Drivetrain implements Mechanism {
     public Command drive(Gamepad gamepad) {
         return infinite(() -> {
             follower.manual(-gamepad.right_stick_y, -gamepad.right_stick_x,
-                    -gamepad.left_stick_x);
+                    -gamepad.left_stick_x * 0.75);
             follower.update();
         })
                 .setEnd(condition -> stopImmediately());
