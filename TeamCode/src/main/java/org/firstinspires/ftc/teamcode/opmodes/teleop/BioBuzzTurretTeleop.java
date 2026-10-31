@@ -112,6 +112,7 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         telemetry.addData("Alliance", alliance);
         telemetry.addData("Aiming at: ", robot.Turret().getTarget());
         telemetry.addData("Aim mode", robot.Turret().getMode());
+        telemetry.addData("Vision", robot.Turret().getVisionStatus());
         telemetry.addData("Limelight", robot.Limelight().isAvailable()
                 ? "Configured" : "Unavailable (check USB/config)");
         telemetry.addData("Turret degrees", robot.Turret().getDegrees());
@@ -122,6 +123,7 @@ public abstract class BioBuzzTurretTeleop extends TeleOp {
         telemetry.addData("Pose", robot.Drivetrain().getFollower().pose());
         panelsTelemetry.addData("Alliance", alliance);
         panelsTelemetry.addData("Aim mode", robot.Turret().getMode());
+        panelsTelemetry.addData("Vision", robot.Turret().getVisionStatus());
         panelsTelemetry.addData("Turret degrees", robot.Turret().getDegrees());
         panelsTelemetry.addData("Turret encoder ticks", robot.Turret().getEncoderTicks());
         panelsTelemetry.addData("Turret ticks/degree", TurretConfig.ticksPerDegree);

@@ -40,6 +40,7 @@ public class Turret implements Mechanism {
     private double visionTimestamp = Double.NaN;
     private double visionDegrees = Double.NaN;
     private String mode = "OFF";
+    private String visionStatus = "NOT RUN";
 
     public final Command aimTurret = instant(() -> {
         fixedDegrees = Double.NaN;
@@ -119,6 +120,7 @@ public class Turret implements Mechanism {
     public void periodic() {
         if (turret == null) return;
         targetDegrees = Double.NaN;
+        visionStatus = "NOT RUN (" + mode + ")";
         if (!enabled || !calibrated()) {
             mode = !enabled ? "OFF" : "CALIBRATION REQUIRED";
             pid.reset();
@@ -176,22 +178,52 @@ public class Turret implements Mechanism {
 
     private void updateVision(double current) {
         if (!TurretConfig.useVision) {
+            visionStatus = "OFF (TurretConfig.useVision = false)";
             clearVision();
             return;
         }
+        if (!limelight.isAvailable()) {
+            visionStatus = "NO LIMELIGHT (hardware config name must be \"limelight\")";
+            clearVision();
+            return;
+        }
+        limelight.setPipeline(TurretConfig.pipeline);
         LLResult result = limelight.getLatestResult();
-        if (result == null || !result.isValid() || result.getFiducialResults() == null) {
+        if (result == null) {
+            visionStatus = "NO RESULT (camera not streaming yet)";
+            clearVision();
+            return;
+        }
+        if (result.getPipelineIndex() != TurretConfig.pipeline) {
+            visionStatus = "WRONG PIPELINE: camera " + result.getPipelineIndex()
+                    + ", TurretConfig.pipeline " + TurretConfig.pipeline;
+            clearVision();
+            return;
+        }
+        if (!result.isValid() || result.getFiducialResults() == null
+                || result.getFiducialResults().isEmpty()) {
+            visionStatus = "NO TAGS SEEN (is pipeline " + TurretConfig.pipeline + " AprilTag?)";
             clearVision();
             return;
         }
 
         double age = result.getStaleness() + result.getCaptureLatency() + result.getTargetingLatency();
+        if (!Double.isFinite(age) || age < 0 || age > TurretConfig.maxFrameAgeMs) {
+            visionStatus = String.format("STALE FRAME: %.0f ms > maxFrameAgeMs %.0f",
+                    age, TurretConfig.maxFrameAgeMs);
+            clearVision();
+            return;
+        }
+
         double sumError = 0;
         int accepted = 0;
+        StringBuilder seen = new StringBuilder();
         for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
             int id = tag.getFiducialId();
+            double tx = tag.getTargetXDegrees();
+            seen.append(String.format(" %d(tx %.1f)", id, tx));
             if (!target.acceptsTag(id)) continue;
-            double txError = tag.getTargetXDegrees() - TurretConfig.desiredTx(target, id);
+            double txError = tx - TurretConfig.desiredTx(target, id);
             if (!Calculations.usableVision(target, id,
                     result.getPipelineIndex(), TurretConfig.pipeline, age,
                     TurretConfig.maxFrameAgeMs, txError, TurretConfig.acquireDegrees)) continue;
@@ -199,9 +231,15 @@ public class Turret implements Mechanism {
             accepted++;
         }
         if (accepted == 0) {
-            clearVision(); // Missing/wrong/stale tag falls back to odometry.
+            // Missing/wrong/stale tag falls back to odometry.
+            visionStatus = "NO USABLE TAG for " + target + " (tags " + target.firstTagId + ".."
+                    + (target.firstTagId + 3) + ", |tx - desiredTx| <= " + TurretConfig.acquireDegrees
+                    + "); saw" + seen;
+            clearVision();
             return;
         }
+        visionStatus = String.format("LOCKED: %d tag(s), avg tx error %.1f, age %.0f ms",
+                accepted, sumError / accepted, age);
 
         if (result.getTimestamp() != visionTimestamp) {
             visionTimestamp = result.getTimestamp();
@@ -214,6 +252,7 @@ public class Turret implements Mechanism {
             targetDegrees = visionDegrees;
             mode = "LIMELIGHT";
         } else {
+            visionStatus = "TAG SEEN BUT CORRECTION OUTSIDE min/maxDegrees";
             clearVision();
         }
     }
@@ -244,6 +283,8 @@ public class Turret implements Mechanism {
     public double getTargetDegrees() { return targetDegrees; }
     public int getEncoderTicks() { return turretMotor == null ? 0 : turretMotor.getCurrentPosition(); }
     public String getMode() { return mode; }
+    /** Why the last loop did or did not use the Limelight; shows the first check that failed. */
+    public String getVisionStatus() { return visionStatus; }
     public HiveTarget getTarget() { return target; }
     public boolean isAligned() {
         return enabled && Double.isFinite(targetDegrees)
