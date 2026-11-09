@@ -5,16 +5,15 @@ import com.pedropathing.api.PoseFactory;
 import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 
-/** Supplied single-curve far partner route. */
+/** Far partner route: a single line to park. */
 public class farPartnerAuto {
     private final PoseFactory poseFactory = PoseFactory.degrees();
 
-    public final Pose startPose = poseFactory.of(64.3683, 134.3288, 270);
-    private final Pose path1End = poseFactory.of(9.894, 116.3838, 0);
-    private final Pose path1Control = poseFactory.of(46.7638, 114.1626, 0);
+    public final Pose startPose = poseFactory.of(64.2742, 134.4415, 270);
+    private final Pose path1End = poseFactory.of(11.8757, 91.5075, 0);
 
     public Path path1() {
-        return Paths.curve(startPose, path1Control, path1End)
+        return Paths.line(startPose, path1End)
                 .linear(startPose, path1End);
     }
 }

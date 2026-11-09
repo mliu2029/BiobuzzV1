@@ -5,8 +5,8 @@ import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.data.Alliance;
 
 @NextTeleop(name = "TeleOp Red", group = "BioBuzz")
-public class BioBuzzRedTurretTeleop extends BioBuzzTurretTeleop {
-    public BioBuzzRedTurretTeleop(Robot robot) {
+public class TeleopRed extends mainTeleOp {
+    public TeleopRed(Robot robot) {
         super(robot, Alliance.RED);
     }
 }

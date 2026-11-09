@@ -21,10 +21,10 @@ public class Robot implements NextRobot {
     private final Limelight limelight = new Limelight();
     private final Turret turret = new Turret(limelight);
     private final Transfer transfer = new Transfer();
-    private final Ramp ramp =new Ramp();
+    private final Ramp ramp = new Ramp();
 
     private final Set<Mechanism> mechanisms = Collections.unmodifiableSet(
-            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, transfer, limelight, turret,ramp)));
+            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, transfer, limelight, turret, ramp)));
 
     public Drivetrain Drivetrain() { return drivetrain; }
     public Intake Intake() { return intake; }
@@ -39,7 +39,6 @@ public class Robot implements NextRobot {
         return mechanisms;
     }
 
-    /** Disarm a reused robot during INIT without commanding any servo positions. */
     public void prepareForInit(HardwareMap hardwareMap) {
         Scheduler.reset();
         turret.stopImmediately();
@@ -47,7 +46,6 @@ public class Robot implements NextRobot {
         shooter.stopImmediately();
         intake.stopImmediately();
         transfer.prepareForInit();
-        // Bypass output caches: an interrupted prior OpMode may have left stale outputs.
         for (DcMotor motor : hardwareMap.getAll(DcMotor.class)) {
             motor.setPower(0);
         }

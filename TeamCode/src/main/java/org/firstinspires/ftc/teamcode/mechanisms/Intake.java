@@ -1,11 +1,12 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
-import dev.nextftc.hardware.actuators.MotorVelocityConstants;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
-import dev.nextftc.units.Units;
+import java.util.function.LongSupplier;
 
+@Configurable
 public class Intake implements Mechanism {
     public static final double DEFAULT_P = 0.000001;
     public static final double DEFAULT_I = 0.0;
@@ -13,75 +14,102 @@ public class Intake implements Mechanism {
     public static final double DEFAULT_F = 0.000323;
     public static final double DEFAULT_TARGET_VELOCITY = 2500;
 
-    private final NextMotor intake;
-    private boolean enabled;
-    private boolean velocityGainsValid = true;
-    private double targetVelocity;
+    // Starting values: tune with the loaded intake on the robot.
+    public static volatile boolean stallDetectionEnabled = true;
+    public static volatile double stallVelocityFraction = 0.10;
+    public static volatile double stallStartupDelayMs = 500;
+    public static volatile double stallConfirmMs = 300;
 
-    public final Command runIntake = instant(() -> setVelocity(DEFAULT_TARGET_VELOCITY));
-    public final Command runIntakeReverse = instant(() -> setVelocity(-DEFAULT_TARGET_VELOCITY));
-    public final Command stopIntake = instant(this::stopImmediately);
+    private final NextMotor intake;
+    private final LongSupplier nanoTime;
+    private double requestedVelocity;
+    private double targetVelocity;
+    private boolean stalled;
+    private long runStartedNanos;
+    private long slowSinceNanos = Long.MIN_VALUE;
+
+    public final Command runIntake = instant(this::restart);
 
     public Intake() {
-        this(new NextMotor("intake"));
+        this(new NextMotor("intake"), System::nanoTime);
     }
 
-    Intake(NextMotor intake) {
+    Intake(NextMotor intake, LongSupplier nanoTime) {
         this.intake = intake;
+        this.nanoTime = nanoTime;
     }
 
     public void initialize() {
-// THE MOTOR IS REVERSE DONT CHANGE IT
         intake.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         intake.setDirection(NextMotor.Direction.REVERSE);
         stopImmediately();
-        velocityGainsValid = false;
         setPIDFCoefficients(DEFAULT_P, DEFAULT_I, DEFAULT_D, DEFAULT_F);
     }
 
     public void setVelocity(double velocity) {
-        double target = Double.isFinite(velocity) ? velocity : 0;
-        boolean targetChanged = targetVelocity != target;
-        targetVelocity = target;
-        if (target == 0 || !velocityGainsValid) {
+        if (!Double.isFinite(velocity) || velocity == 0) {
             stopImmediately();
             return;
         }
-        if (!enabled || targetChanged) intake.getVelocityPID().reset();
-        enabled = true;
-        intake.setVelocitySetpoint(Units.RadiansPerSecond.of(target));
+        if (velocity < 0) {
+            // Reverse remains available to clear a jam.
+            stalled = false;
+            slowSinceNanos = Long.MIN_VALUE;
+        } else if (requestedVelocity <= 0) {
+            runStartedNanos = nanoTime.getAsLong();
+            slowSinceNanos = Long.MIN_VALUE;
+        }
+        requestedVelocity = velocity;
+        targetVelocity = stalled ? 0 : velocity;
+        VelocityMotors.setVelocity(intake, targetVelocity);
+    }
+
+    /** Explicit forward restart, including after the full/stalled latch has stopped the motor. */
+    public void restart() {
+        stalled = false;
+        requestedVelocity = 0;
+        setVelocity(DEFAULT_TARGET_VELOCITY);
+    }
+
+    @Override
+    public void periodic() {
+        if (!stallDetectionEnabled || requestedVelocity <= 0 || stalled) {
+            slowSinceNanos = Long.MIN_VALUE;
+            return;
+        }
+        long now = nanoTime.getAsLong();
+        if ((now - runStartedNanos) / 1e6 < stallStartupDelayMs
+                || Math.abs(getVelocity()) >= requestedVelocity * stallVelocityFraction) {
+            slowSinceNanos = Long.MIN_VALUE;
+            return;
+        }
+        if (slowSinceNanos == Long.MIN_VALUE) slowSinceNanos = now;
+        if ((now - slowSinceNanos) / 1e6 >= stallConfirmMs) {
+            stalled = true;
+            targetVelocity = 0;
+            // Switch out of velocity PID, so it cannot keep pushing against the blockage.
+            VelocityMotors.stop(intake);
+        }
     }
 
     public void setPIDFCoefficients(double p, double i, double d, double f) {
-        if (!Double.isFinite(p) || !Double.isFinite(i)
-                || !Double.isFinite(d) || !Double.isFinite(f)) {
-            velocityGainsValid = false;
-            stopImmediately();
-            return;
-        }
-        MotorVelocityConstants gains = intake.getVelocityConstants();
-        if (velocityGainsValid && gains.getKP() == p && gains.getKI() == i
-                && gains.getKD() == d && gains.getKV() == f) {
-            return;
-        }
-        gains.setKP(p);
-        gains.setKI(i);
-        gains.setKD(d);
-        gains.setKV(f);
-        intake.getVelocityPID().reset();
-        velocityGainsValid = true;
+        VelocityMotors.setPIDF(intake, p, i, d, f);
     }
 
     public double getTargetVelocity() { return targetVelocity; }
-    public double getVelocity() { return -intake.getEncoderVelocity().into(Units.RadiansPerSecond); }
-    public double getPower() { return Math.max(-1, Math.min(1, intake.getThrottle())); }
-    public boolean isEnabled() { return enabled; }
+    public double getVelocity() { return -VelocityMotors.velocity(intake); }
+    public double getPower() { return intake.getThrottle(); }
+    public boolean isStalled() { return stalled; }
+    public String getStatus() {
+        return stalled ? "Full / stalled" : targetVelocity > 0 ? "Intaking"
+                : targetVelocity < 0 ? "Reverse" : "Off";
+    }
 
     public void stopImmediately() {
-        enabled = false;
+        requestedVelocity = 0;
         targetVelocity = 0;
-        intake.getVelocityPID().reset();
-        intake.setThrottle(0.0);
-        intake.update();
+        stalled = false;
+        slowSinceNanos = Long.MIN_VALUE;
+        VelocityMotors.stop(intake);
     }
 }

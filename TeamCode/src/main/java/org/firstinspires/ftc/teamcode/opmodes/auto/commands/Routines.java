@@ -41,6 +41,7 @@ public class Routines {
                 commands.shoot(),
                 commands.followPath(paths.gardenPrep, "gardenPrep"),
                 commands.followPath(paths.intakeGarden, "intakeGarden"),
+                Commands.waitMs(2000),
                 commands.followPath(paths.park, "park"),
                 commands.finish()
         );
@@ -49,6 +50,7 @@ public class Routines {
     public Command farPartnerAuto(farPartnerAuto paths) {
         return sequential(
                 commands.init(),
+                Commands.waitMs(20000),
                 commands.shoot(),
                 commands.followPath(paths.path1(), "path1"),
                 commands.finish()
@@ -102,33 +104,17 @@ public class Routines {
                 commands.shoot(),
                 commands.followPath(paths.park(), "park"),
                 commands.finish()
-        );  
-        
+        );
     }
 
     public Command redSolo2Tip(redSolo2Tip paths) {
         return sequential(
                 commands.init(),
                 Commands.waitMs(1500),
-
                 commands.shoot(),
                 commands.followPath(paths.gardenPrep, "gardenPrep"),
                 commands.followPath(paths.intakeGarden, "intakeGarden"),
                 Commands.waitMs(2000),
-
-                //commands.followPath(paths.shoot1, "shoot1"),
-                //commands.shoot(),
-                //robot.Ramp().down,
-                //commands.followPath(paths.flowerPrep1, "flowerPrep1"),
-                //commands.followPath(paths.flowerIntake1, "flowerIntake1"),
-                //Commands.waitMs(1500),
-                //commands.followPath(paths.returnToShootFar, "returnToShootFar"),
-                //commands.shoot(),
-                //commands.followPath(paths.flowerPrep2, "flowerPrep2"),
-                //commands.followPath(paths.flowerIntake2, "flowerIntake2"),
-                //Commands.waitMs(1500),
-                //commands.followPath(paths.shoot2, "shoot2"),
-               // commands.shoot(),
                 commands.followPath(paths.park, "park"),
                 commands.finish()
         );
@@ -138,23 +124,7 @@ public class Routines {
         return sequential(
                 commands.init(),
                 Commands.waitMs(1500),
-
                 commands.shoot(),
-                commands.followPath(paths.gardenPrep, "gardenPrep"),
-                commands.followPath(paths.intakeGarden, "intakeGarden"),
-                //commands.followPath(paths.shoot1, "shoot1"),
-                //commands.shoot(),
-                //robot.Ramp().down,
-                //commands.followPath(paths.flowerPrep1, "flowerPrep1"),
-                //commands.followPath(paths.flowerIntake1, "flowerIntake1"),
-                //Commands.waitMs(1500),
-                //commands.followPath(paths.returnToShootFar, "returnToShootFar"),
-                //commands.shoot(),
-                //commands.followPath(paths.flowerPrep2, "flowerPrep2"),
-                //commands.followPath(paths.flowerIntake2, "flowerIntake2"),
-                //Commands.waitMs(1500),
-                //commands.followPath(paths.shoot2, "shoot2"),
-                //commands.shoot(),
                 commands.followPath(paths.park, "park"),
                 commands.finish()
         );

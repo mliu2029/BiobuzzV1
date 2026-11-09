@@ -6,8 +6,6 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import dev.nextftc.robot.Mechanism;
 
 public class Limelight implements Mechanism {
-    public Limelight(){}
-
     private Limelight3A limelight;
     private int pipeline = -1;
 
@@ -17,7 +15,6 @@ public class Limelight implements Mechanism {
         if (limelight == null) return;
         limelight.setPollRateHz(50);
         limelight.start();
-
     }
 
     /** Switches the camera pipeline; only sends a request when the index changes. */
@@ -26,7 +23,6 @@ public class Limelight implements Mechanism {
         if (limelight.pipelineSwitch(index)) pipeline = index;
     }
 
-
     public LLResult getLatestResult() {
         return limelight == null ? null : limelight.getLatestResult();
     }
@@ -34,5 +30,4 @@ public class Limelight implements Mechanism {
     public boolean isAvailable() {
         return limelight != null;
     }
-
 }

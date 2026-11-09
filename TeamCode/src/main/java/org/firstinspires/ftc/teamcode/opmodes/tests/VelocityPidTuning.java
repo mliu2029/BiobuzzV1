@@ -64,11 +64,7 @@ public class VelocityPidTuning extends NextOpMode {
 
         robot.Intake().setPIDFCoefficients(intakeP, intakeI, intakeD, intakeF);
         robot.Intake().setVelocity(runIntake ? intakeTargetVelocity : 0);
-        if (openTransfer) {
-            robot.Transfer().openImmediately();
-        } else {
-            robot.Transfer().closeImmediately();
-        }
+        robot.Transfer().setFeeding(openTransfer);
         robot.Shooter().setVelocity(targetVelocity);
         panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
                 ? robot.Shooter().getTargetVelocity() : 0.0);

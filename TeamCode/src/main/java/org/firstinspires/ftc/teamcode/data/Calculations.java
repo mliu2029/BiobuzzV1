@@ -1,9 +1,9 @@
 package org.firstinspires.ftc.teamcode.data;
 
-public final class  Calculations {
+public final class Calculations {
     private Calculations() { }
 
-// calculation for turret
+    /** Field-relative bearing from the robot to a hive, in robot-relative degrees. */
     public static double bearing(double x, double y, double headingRadians, HiveTarget target) {
         if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(headingRadians)) {
             return Double.NaN;
@@ -45,5 +45,8 @@ public final class  Calculations {
         if (trackedId == target.secondAimTagId && secondUsable) return trackedId;
         if (firstUsable) return target.firstAimTagId;
         return secondUsable ? target.secondAimTagId : -1;
+    }
+    public static double velocity(double distance){
+        return 2.93909*(distance)+1460.15416;
     }
 }
