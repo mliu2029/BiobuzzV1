@@ -8,10 +8,10 @@ import com.pedropathing.math.Pose;
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
-import org.firstinspires.ftc.teamcode.data.OpModeStorage;
+import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.data.Alliance;
-import org.firstinspires.ftc.teamcode.data.TurretConfig;
+import org.firstinspires.ftc.teamcode.util.Alliance;
+import org.firstinspires.ftc.teamcode.util.TurretConfig;
 import org.firstinspires.ftc.teamcode.mechanisms.Intake;
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer;
 import java.util.Locale;
@@ -24,7 +24,6 @@ public abstract class mainTeleOp extends NextOpMode {
     public static volatile boolean runIntake = false;
     public static volatile boolean reverseIntake = false;
     public static volatile boolean openTransfer = false;
-    // Mark the pose of the odometry origin on the field. Blue uses the 180-degree mirror.
     public static volatile double redPoseResetX = 8;
     public static volatile double redPoseResetY = 8;
     public static volatile double redPoseResetHeadingDegrees = 90;
@@ -32,7 +31,7 @@ public abstract class mainTeleOp extends NextOpMode {
     protected final Robot robot;
     private final Alliance alliance;
     private boolean started;
-    private boolean intakeRestartedForTransfer;
+    private boolean wasTransferOpen;
     private final TelemetryManager panelsTelemetry =
         PanelsTelemetry.INSTANCE.getTelemetry();
     private double shooterPresetVelocity;
@@ -97,6 +96,7 @@ public abstract class mainTeleOp extends NextOpMode {
         }
         headingDegrees = (headingDegrees % 360 + 360) % 360;
         robot.Drivetrain().getFollower().setPose(new Pose(x, y, Math.toRadians(headingDegrees)));
+        robot.Turret().resetOdometryAimCorrection();
         poseResetStatus = String.format(Locale.US, "Reset to (%.1f, %.1f, %.1f deg)",
                 x, y, headingDegrees);
     }
@@ -162,7 +162,7 @@ public abstract class mainTeleOp extends NextOpMode {
         reverseIntake = false;
         openTransfer = false;
         robot.Transfer().setRollerVelocity(900);
-        intakeRestartedForTransfer = false;
+        wasTransferOpen = false;
         poseResetStatus = "D2 D-pad Left at the marked pose";
         robot.Transfer().setFeeding(false);
         robot.Drivetrain().getFollower().setPose(startingPose);
@@ -183,14 +183,12 @@ public abstract class mainTeleOp extends NextOpMode {
         robot.Turret().setManualInput(gamepad2.left_bumper, gamepad2.right_bumper);
         double shooterVelocity = getShooterTargetVelocity();
         robot.Shooter().setVelocity(shooterVelocity);
-        // Rearm the intake once per transfer press.
-        if (!openTransfer) intakeRestartedForTransfer = false;
-        if (openTransfer && !intakeRestartedForTransfer) {
+        if (openTransfer && !wasTransferOpen) {
             reverseIntake = false;
             runIntake = true;
             robot.Intake().restart();
-            intakeRestartedForTransfer = true;
         }
+        wasTransferOpen = openTransfer;
         robot.Transfer().setFeeding(openTransfer);
         if (Double.isFinite(shooterVelocity) && shooterVelocity > 0) {
             shooterPresetVelocity = shooterVelocity;

@@ -62,14 +62,38 @@ Use the AprilTag pipeline selected by `TurretConfig.pipeline` (default 0):
 The robot computes a separate 3D point of interest for each ID using the
 individual tag pose. The camera's single global POI is not used for this mode;
 there is no need to cycle pipelines or set a new camera POI when tags switch.
-The legacy `redCloseTx` / `blueCloseTx` / `redFarTx` / `blueFarTx` arrays apply only
-to the raw-tag test mode.
+In `odo turret test`, `useVision` enables direct four-tag Limelight 3D aiming
+with odometry running as a fallback. A usable tag drives the turret toward the
+projected cell opening on each fresh camera frame. Its horizontal error is
+`atan2(centerRight, centerForward)` from the 3D point alone; raw tag `tx`,
+crosshair offsets, and the pipeline POI are not added to that angle. A centered
+opening therefore requests zero correction even when the visible tag is off
+to one side. The camera's forward axis must be aligned with the launcher.
+Repeated reads of the same frame hold its setpoint rather than adding the error
+again.
 
-In `odo turret test`, enable `useVision`, `usePointOfInterest`, and
-`useTagGeometry` for four-tag 3D POI with odometry fallback. Vision remains off by
-default in that test. Disabling only `useTagGeometry` restores the existing
-single-tag camera-POI test, which requires its ID filter and global POI to be
-configured for the chosen tag.
+Odometry selects the close or far alliance hive from the robot's Y position and
+keeps an aiming angle ready in parallel. When the selected hive has no usable
+camera target, or its camera target is outside the encoder limits, the turret
+uses that odometry angle. A usable tag immediately returns control to Limelight
+3D, including while the robot or turret is moving. Turning `useVision` off selects
+odometry only.
+
+The turret starts with its encoder angle treated as 0°. After the chassis and
+turret have stayed nearly still for at least 200 ms, a fresh 3D tag can also
+correct the turret's chassis-relative angle once. That saved offset improves
+the odometry fallback. This stationary calibration does not gate or replace
+direct camera aiming.
+
+Losing the usable tag re-arms calibration for its next sighting while retaining
+the saved offset. The robot must be still again before another calibration is
+accepted. `TurretAngleEstimator.applyVisionCorrections` in Panels disables and
+clears this offset calibration; Limelight 3D continues to aim while
+`useVision` is enabled.
+
+The encoder travel limits still guard motor motion. A manual turret recenter or
+marked chassis pose reset clears the offset. Telemetry shows the chassis heading,
+relative goal bearing, turret target, and learned offset.
 
 Verify on the robot that each of the four tags produces the same opening aim,
 that obscuring the tracked tag hands off smoothly, and that an upside-down cell

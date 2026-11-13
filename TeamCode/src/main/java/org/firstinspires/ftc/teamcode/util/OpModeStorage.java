@@ -1,0 +1,27 @@
+package org.firstinspires.ftc.teamcode.util;
+
+import com.pedropathing.math.Pose;
+
+public final class OpModeStorage {
+    private OpModeStorage() { }
+
+    public static Pose autonomousEndPose = new Pose(53, 7, Math.toRadians(90));
+    public static double autonomousEndTurretDegrees = 0.0;
+
+    public static void saveAutonomousEndPose(Pose pose) {
+        if (pose != null && Double.isFinite(pose.x()) && Double.isFinite(pose.y())
+                && Double.isFinite(pose.heading())) {
+            autonomousEndPose = pose;
+        }
+    }
+
+    public static void saveAutonomousEndTurretDegrees(double degrees) {
+        autonomousEndTurretDegrees = Double.isFinite(degrees) ? degrees : 0.0;
+    }
+
+    public static double consumeAutonomousEndTurretDegrees() {
+        double degrees = autonomousEndTurretDegrees;
+        autonomousEndTurretDegrees = 0.0;
+        return Double.isFinite(degrees) ? degrees : 0.0;
+    }
+}

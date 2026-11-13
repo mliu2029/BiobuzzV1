@@ -4,7 +4,7 @@ import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
-import java.util.function.LongSupplier;
+import dev.nextftc.units.Units;
 
 @Configurable
 public class Intake implements Mechanism {
@@ -14,29 +14,20 @@ public class Intake implements Mechanism {
     public static final double DEFAULT_F = 0.000323;
     public static final double DEFAULT_TARGET_VELOCITY = 2500;
 
-    // Starting values: tune with the loaded intake on the robot.
-    public static volatile boolean stallDetectionEnabled = true;
-    public static volatile double stallVelocityFraction = 0.10;
-    public static volatile double stallStartupDelayMs = 500;
-    public static volatile double stallConfirmMs = 300;
+    public static volatile double stallVelocity = 250;
+    public static volatile double stallSeconds = 3.0;
 
-    private final NextMotor intake;
-    private final LongSupplier nanoTime;
-    private double requestedVelocity;
+    private final NextMotor intake = new NextMotor("intake");
     private double targetVelocity;
     private boolean stalled;
-    private long runStartedNanos;
-    private long slowSinceNanos = Long.MIN_VALUE;
+    private long slowSinceNanos;
 
     public final Command runIntake = instant(this::restart);
 
-    public Intake() {
-        this(new NextMotor("intake"), System::nanoTime);
-    }
-
-    Intake(NextMotor intake, LongSupplier nanoTime) {
-        this.intake = intake;
-        this.nanoTime = nanoTime;
+    public void restart() {
+        stalled = false;
+        slowSinceNanos = 0;
+        setVelocity(DEFAULT_TARGET_VELOCITY);
     }
 
     public void initialize() {
@@ -47,69 +38,47 @@ public class Intake implements Mechanism {
     }
 
     public void setVelocity(double velocity) {
-        if (!Double.isFinite(velocity) || velocity == 0) {
-            stopImmediately();
-            return;
-        }
-        if (velocity < 0) {
-            // Reverse remains available to clear a jam.
+        if (velocity <= 0) {
             stalled = false;
-            slowSinceNanos = Long.MIN_VALUE;
-        } else if (requestedVelocity <= 0) {
-            runStartedNanos = nanoTime.getAsLong();
-            slowSinceNanos = Long.MIN_VALUE;
+            slowSinceNanos = 0;
         }
-        requestedVelocity = velocity;
-        targetVelocity = stalled ? 0 : velocity;
-        VelocityMotors.setVelocity(intake, targetVelocity);
-    }
-
-    /** Explicit forward restart, including after the full/stalled latch has stopped the motor. */
-    public void restart() {
-        stalled = false;
-        requestedVelocity = 0;
-        setVelocity(DEFAULT_TARGET_VELOCITY);
+        if (stalled) return;
+        targetVelocity = velocity;
+        if (velocity == 0) stopImmediately();
+        else intake.setVelocitySetpoint(Units.RadiansPerSecond.of(velocity));
     }
 
     @Override
     public void periodic() {
-        if (!stallDetectionEnabled || requestedVelocity <= 0 || stalled) {
-            slowSinceNanos = Long.MIN_VALUE;
+        if (targetVelocity <= 0 || Math.abs(getVelocity()) >= stallVelocity) {
+            slowSinceNanos = 0;
             return;
         }
-        long now = nanoTime.getAsLong();
-        if ((now - runStartedNanos) / 1e6 < stallStartupDelayMs
-                || Math.abs(getVelocity()) >= requestedVelocity * stallVelocityFraction) {
-            slowSinceNanos = Long.MIN_VALUE;
-            return;
-        }
-        if (slowSinceNanos == Long.MIN_VALUE) slowSinceNanos = now;
-        if ((now - slowSinceNanos) / 1e6 >= stallConfirmMs) {
+        long now = System.nanoTime();
+        if (slowSinceNanos == 0) slowSinceNanos = now;
+        if ((now - slowSinceNanos) / 1e9 >= stallSeconds) {
+            stopImmediately();
             stalled = true;
-            targetVelocity = 0;
-            // Switch out of velocity PID, so it cannot keep pushing against the blockage.
-            VelocityMotors.stop(intake);
         }
     }
 
     public void setPIDFCoefficients(double p, double i, double d, double f) {
-        VelocityMotors.setPIDF(intake, p, i, d, f);
+        intake.getVelocityConstants().withP(p).withI(i).withD(d).withV(f);
     }
 
     public double getTargetVelocity() { return targetVelocity; }
-    public double getVelocity() { return -VelocityMotors.velocity(intake); }
+    public double getVelocity() { return -intake.getEncoderVelocity().into(Units.RadiansPerSecond); }
     public double getPower() { return intake.getThrottle(); }
-    public boolean isStalled() { return stalled; }
     public String getStatus() {
-        return stalled ? "Full / stalled" : targetVelocity > 0 ? "Intaking"
-                : targetVelocity < 0 ? "Reverse" : "Off";
+        return stalled ? "Stalled" : targetVelocity > 0 ? "Intaking" : targetVelocity < 0 ? "Reverse" : "Off";
     }
 
     public void stopImmediately() {
-        requestedVelocity = 0;
         targetVelocity = 0;
         stalled = false;
-        slowSinceNanos = Long.MIN_VALUE;
-        VelocityMotors.stop(intake);
+        slowSinceNanos = 0;
+        intake.getVelocityPID().reset();
+        intake.setThrottle(0);
+        intake.update();
     }
 }

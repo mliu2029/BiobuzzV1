@@ -1,8 +1,8 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.ivy.Command;
-import com.pedropathing.ivy.behaviors.EndCondition;
 import com.pedropathing.math.Pose;
+import com.pedropathing.math.Velocity;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -16,11 +16,12 @@ import dev.nextftc.units.Units;
 import java.util.Objects;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
-import org.firstinspires.ftc.teamcode.data.HiveTarget;
-import org.firstinspires.ftc.teamcode.data.Alliance;
-import org.firstinspires.ftc.teamcode.data.Calculations;
-import org.firstinspires.ftc.teamcode.data.HiveAimGeometry;
-import org.firstinspires.ftc.teamcode.data.TurretConfig;
+import org.firstinspires.ftc.teamcode.util.HiveTarget;
+import org.firstinspires.ftc.teamcode.util.Alliance;
+import org.firstinspires.ftc.teamcode.util.Calculations;
+import org.firstinspires.ftc.teamcode.util.HiveAimGeometry;
+import org.firstinspires.ftc.teamcode.util.TurretConfig;
+import org.firstinspires.ftc.teamcode.util.TurretAngleEstimator;
 
 public class Turret implements Mechanism {
     private static final double POWER_CACHE_TOLERANCE = 0.001;
@@ -31,20 +32,19 @@ public class Turret implements Mechanism {
     private final PIDController pid = new PIDController(gains);
     private HiveTarget target = HiveTarget.RED_CLOSE;
     private Alliance alliance;
-    private Supplier<Pose> odometryTestPose;
+    private Supplier<Pose> odometryPoseSupplier;
+    private Supplier<Velocity> odometryVelocitySupplier;
+    private final TurretAngleEstimator angleEstimator = new TurretAngleEstimator();
+    private long aimUpdateTimeNanos;
     private DoubleSupplier movingAimDegrees;
     private DoubleSupplier movingAimRate;
-    private boolean testVisionEnabled;
-    private int testPointOfInterestTagId = -1;
-    private boolean testTagGeometryEnabled;
-    private HiveTarget lastGeometryTarget;
+    private boolean odometryVisionEnabled;
     private boolean enabled;
     private boolean manualControl;
     private double manualDirection;
     private double startingDegrees;
     private int encoderZeroTicks;
     private double targetDegrees = Double.NaN;
-    private double fixedDegrees = Double.NaN;
     private double visionTimestamp = Double.NaN;
     private long visionReceiptTimestamp = Long.MIN_VALUE;
     private double visionDegrees = Double.NaN;
@@ -56,6 +56,7 @@ public class Turret implements Mechanism {
     private int visionPipeline = -1;
     private String visionTags = "[]";
     private double visionErrorDegrees = Double.NaN;
+    private double visionRequestedDegrees = Double.NaN;
     private int visionErrorTagId = -1;
     private String motionStatus = "Auto aim off";
     private double lastRecenterDegrees = Double.NaN;
@@ -77,27 +78,46 @@ public class Turret implements Mechanism {
             recenterCount++;
             encoderZeroTicks = turretMotor.getCurrentPosition();
             startingDegrees = 0;
+            resetOdometryAimCorrection();
         }
         manualControl = false;
         manualDirection = 0;
-        fixedDegrees = Double.NaN;
         targetDegrees = Double.NaN;
         enabled = true;
         mode = movingAimDegrees != null ? "SHOOTING ON THE MOVE"
-                : odometryTestPose == null ? "LIMELIGHT ONLY: WAITING" : "ODOMETRY TEST";
+                : odometryPoseSupplier == null ? "LIMELIGHT ONLY: WAITING" : "ODOMETRY";
         motionStatus = movingAimDegrees != null ? "Waiting for ballistic solution"
-                : odometryTestPose == null ? "Waiting for camera" : "Waiting for pose";
+                : odometryPoseSupplier == null ? "Waiting for camera" : "Waiting for pose";
         clearVision();
         resetVisionDiagnostics("Awaiting auto aim update");
+        angleEstimator.resetStillness();
         pid.reset();
     }
 
-    public void useOdometryForTest(Supplier<Pose> poseSupplier) {
+    public void setAlliance(Alliance alliance) {
+        Objects.requireNonNull(alliance, "Alliance is required");
+        if (this.alliance == alliance) return;
+        boolean wasFar = this.alliance != null && target == this.alliance.far;
+        this.alliance = alliance;
+        target = wasFar ? alliance.far : alliance.close;
+        angleEstimator.reset();
+        resetAim();
+    }
+
+    public void useOdometryAim(Supplier<Pose> poseSupplier, Supplier<Velocity> velocitySupplier) {
         if (turretMotor == null) throw new IllegalStateException("Initialize the turret first");
         movingAimDegrees = null;
         movingAimRate = null;
-        odometryTestPose = Objects.requireNonNull(poseSupplier);
+        odometryPoseSupplier = Objects.requireNonNull(poseSupplier);
+        odometryVelocitySupplier = Objects.requireNonNull(velocitySupplier);
+        resetOdometryAimCorrection();
         resumeAutoAim();
+    }
+
+    /** Forget the camera-corrected reference when the chassis pose or turret zero is reset. */
+    public void resetOdometryAimCorrection() {
+        angleEstimator.reset();
+        clearVision();
     }
 
     /** Continuously track a robot-relative ballistic setpoint and its angular velocity. */
@@ -105,37 +125,22 @@ public class Turret implements Mechanism {
         if (turretMotor == null) throw new IllegalStateException("Initialize the turret first");
         movingAimDegrees = Objects.requireNonNull(angleDegrees);
         movingAimRate = Objects.requireNonNull(rateDegreesPerSecond);
-        odometryTestPose = null;
+        odometryPoseSupplier = null;
+        odometryVelocitySupplier = null;
+        resetOdometryAimCorrection();
         resumeAutoAim();
     }
 
     public boolean isTrackingMovingAim() {
-        return enabled && !manualControl && !Double.isFinite(fixedDegrees) && movingAimDegrees != null
+        return enabled && !manualControl && movingAimDegrees != null
                 && calibrated() && Double.isFinite(TurretConfig.movingVelocityFeedforward)
                 && TurretConfig.movingVelocityFeedforward >= 0;
     }
 
-    /** Allow camera correction with odometry fallback in the test; preserve stop/recenter state. */
-    public void setTestVisionEnabled(boolean enabled) {
-        if (testVisionEnabled == enabled) return;
-        testVisionEnabled = enabled;
-        resetAim();
-    }
-
-    /** Single-tag pipeline POI test; -1 restores the test's raw-tag vision mode. */
-    public void setTestPointOfInterestTag(int tagId) {
-        if (tagId < -1) throw new IllegalArgumentException("POI tag must be -1 or a tag ID");
-        if (testPointOfInterestTagId == tagId) return;
-        testPointOfInterestTagId = tagId;
-        lastGeometryTarget = null;
-        resetAim();
-    }
-
-    /** Project a common cell aim point from any of its four alliance tags in the test. */
-    public void setTestTagGeometryEnabled(boolean enabled) {
-        if (testTagGeometryEnabled == enabled) return;
-        testTagGeometryEnabled = enabled;
-        lastGeometryTarget = null;
+    /** Enable direct 3D aiming while preserving the stop/recenter state and learned odometry offset. */
+    public void setOdometryVisionEnabled(boolean enabled) {
+        if (odometryVisionEnabled == enabled) return;
+        odometryVisionEnabled = enabled;
         resetAim();
     }
 
@@ -159,51 +164,18 @@ public class Turret implements Mechanism {
                 ? (leftBumper ? 1 : -1) : 0;
     }
 
-    /**
-     * Moves to a robot-relative angle (positive is counterclockwise), then holds it.
-     * Waits until within toleranceDegrees (or cancelled) so an autonomous sequence can continue.
-     * Uses getDegrees()'s reference, including the starting angle passed to initialize().
-     * aimTurret resumes automatic aiming.
-     * Requires initialized hardware and calibrated limits; invalid targets are rejected.
-     */
-    public Command moveToDegrees(double degrees) {
-        if (!Double.isFinite(degrees)) {
-            throw new IllegalArgumentException("Turret angle must be finite");
-        }
-        return Command.build()
-                .requiring(this)
-                .setStart(() -> {
-                    stopImmediately();
-                    if (turret == null || !calibrated()) {
-                        throw new IllegalStateException("Initialize and calibrate the turret before moving it");
-                    }
-                    if (degrees < TurretConfig.minDegrees || degrees > TurretConfig.maxDegrees) {
-                        throw new IllegalArgumentException("Turret angle is outside the configured limits: " + degrees);
-                    }
-                    fixedDegrees = degrees;
-                    targetDegrees = degrees;
-                    mode = "POSITION";
-                    enabled = true;
-                })
-                .setDone(this::isAligned)
-                .setEnd(condition -> {
-                    if (condition != EndCondition.NATURALLY) stopImmediately();
-                });
-    }
-
     public void initialize(HardwareMap hardwareMap, Alliance alliance) {
         initialize(hardwareMap, alliance, 0.0);
     }
 
     public void initialize(HardwareMap hardwareMap, Alliance alliance, double startingDegrees) {
         this.alliance = Objects.requireNonNull(alliance, "Alliance is required");
-        odometryTestPose = null;
+        odometryPoseSupplier = null;
+        odometryVelocitySupplier = null;
+        resetOdometryAimCorrection();
         movingAimDegrees = null;
         movingAimRate = null;
-        testVisionEnabled = false;
-        testPointOfInterestTagId = -1;
-        testTagGeometryEnabled = false;
-        lastGeometryTarget = null;
+        odometryVisionEnabled = false;
         this.startingDegrees = Double.isFinite(startingDegrees) ? startingDegrees : 0.0;
         encoderZeroTicks = 0;
         turretMotor = hardwareMap.get(DcMotorImplEx.class, "turret");
@@ -228,7 +200,6 @@ public class Turret implements Mechanism {
         mode = "OFF";
         motionStatus = "Auto aim off";
         targetDegrees = Double.NaN;
-        fixedDegrees = Double.NaN;
         clearVision();
         resetVisionDiagnostics("Auto aim off");
         pid.reset();
@@ -238,6 +209,7 @@ public class Turret implements Mechanism {
     /** Drop the current setpoint and camera lock so the next loop re-acquires from scratch. */
     private void resetAim() {
         clearVision();
+        angleEstimator.resetStillness();
         pid.reset();
         targetDegrees = Double.NaN;
         applyPower(0);
@@ -257,6 +229,7 @@ public class Turret implements Mechanism {
         visionPipeline = -1;
         visionTags = "[]";
         visionErrorDegrees = Double.NaN;
+        visionRequestedDegrees = Double.NaN;
         visionErrorTagId = -1;
     }
 
@@ -296,29 +269,21 @@ public class Turret implements Mechanism {
             return;
         }
         double current = getDegrees();
-        if (Double.isFinite(fixedDegrees)) {
-            // Fixed angles stay relative to the chassis, even as the robot drives.
-            if (fixedDegrees >= TurretConfig.minDegrees && fixedDegrees <= TurretConfig.maxDegrees) {
-                targetDegrees = fixedDegrees;
-            }
-            mode = "POSITION";
-            visionStatus = "Fixed angle command; auto aim inactive";
-        } else if (movingAimDegrees != null) {
+        if (movingAimDegrees != null) {
             clearVision();
             mode = "SHOOTING ON THE MOVE";
             targetDegrees = Calculations.reachableAngle(movingAimDegrees.getAsDouble(), current,
                     TurretConfig.minDegrees, TurretConfig.maxDegrees);
             visionStatus = Double.isFinite(targetDegrees) ? "Ballistic odometry aim"
                     : "No ballistic solution / target outside turret limits";
-        } else if (odometryTestPose != null) {
-            updateTestAim(current);
+        } else if (odometryPoseSupplier != null) {
+            updateOdometryAim(current);
         } else {
             mode = "LIMELIGHT ONLY: WAITING";
-            updateVision(current);
+            updateVision(current, null);
         }
         if (!Double.isFinite(targetDegrees)) {
-            motionStatus = Double.isFinite(fixedDegrees)
-                    ? "Target outside encoder limits" : visionStatus;
+            motionStatus = visionStatus;
             clearVision();
             pid.reset();
             applyPower(0);
@@ -340,17 +305,40 @@ public class Turret implements Mechanism {
         applyPower(output);
     }
 
-    private void updateTestAim(double current) {
+    private void updateOdometryAim(double current) {
         boolean wasUsingVision = visionTagId >= 0;
-        // Always calculate a fresh odometry setpoint before trying the camera.
-        updateOdometryTest(current);
-        if (testVisionEnabled) {
-            updateVision(current);
-            if (visionTagId < 0 && Double.isFinite(targetDegrees)) {
-                mode = "ODOMETRY FALLBACK";
+        Pose pose = odometryPoseSupplier.get();
+        aimUpdateTimeNanos = System.nanoTime();
+        if (pose == null || !Double.isFinite(pose.x()) || !Double.isFinite(pose.y())
+                || !Double.isFinite(pose.heading()) || !Double.isFinite(current)) {
+            angleEstimator.resetStillness();
+            mode = odometryVisionEnabled ? "VISION + ODOMETRY: INVALID POSE" : "ODOMETRY: INVALID POSE";
+            visionStatus = "Invalid drivetrain pose / turret encoder";
+            if (odometryVisionEnabled && Double.isFinite(current)) {
+                updateVision(current, null);
+                if (visionErrorTagId < 0) angleEstimator.tagLost();
+            } else {
+                clearVision();
             }
+            if (wasUsingVision != (visionTagId >= 0)) pid.reset();
+            return;
         }
-        // Avoid carrying derivative/integral history across a change of aiming source.
+        Velocity velocity = odometryVelocitySupplier.get();
+        angleEstimator.updateStillness(aimUpdateTimeNanos,
+                velocity == null ? Double.NaN : Math.hypot(velocity.vx, velocity.vy),
+                velocity == null ? Double.NaN : Math.toDegrees(velocity.omega),
+                getVelocityDegreesPerSecond());
+        updateOdometryTarget(current, pose);
+        if (odometryVisionEnabled) {
+            updateVision(current, pose);
+            if (visionErrorTagId < 0) angleEstimator.tagLost();
+        }
+        if (odometryVisionEnabled && visionTagId < 0) {
+            mode = Double.isFinite(targetDegrees)
+                    ? (angleEstimator.hasCorrection()
+                            ? "ODOMETRY FALLBACK + SAVED CORRECTION" : "ODOMETRY FALLBACK")
+                    : "VISION + ODOMETRY: NO REACHABLE TARGET";
+        }
         if (wasUsingVision != (visionTagId >= 0)) pid.reset();
     }
 
@@ -360,29 +348,24 @@ public class Turret implements Mechanism {
                 : alliance.far.acceptsTag(id) ? alliance.far : null;
     }
 
-    private void updateOdometryTest(double current) {
-        mode = "ODOMETRY TEST";
+    private static double odometryBearing(Pose pose, HiveTarget target) {
+        return pose == null ? Double.NaN
+                : Calculations.bearing(pose.x(), pose.y(), pose.heading(), target);
+    }
+
+    private void updateOdometryTarget(double current, Pose pose) {
+        mode = "ODOMETRY";
         // Preserve the cached camera setpoint between reads of the same frame.
-        if (!testVisionEnabled) clearVision();
-        Pose pose = odometryTestPose.get();
+        if (!odometryVisionEnabled) clearVision();
         if (pose == null) {
             visionStatus = "No drivetrain pose";
             return;
         }
-        // Keep searching for the cell whose POI is configured, even across the field midpoint.
-        boolean poiSelected = testVisionEnabled && testPointOfInterestTagId >= 0;
-        HiveTarget selected;
-        if (testVisionEnabled && testTagGeometryEnabled) {
-            selected = lastGeometryTarget;
-            if (selected == null) selected = cellForTag(testPointOfInterestTagId);
-            if (selected == null) selected = alliance.targetForY(pose.y(), TurretConfig.halfwayY);
-        } else {
-            selected = poiSelected ? cellForTag(testPointOfInterestTagId)
-                    : alliance.targetForY(pose.y(), TurretConfig.halfwayY);
-        }
+        // Odometry chooses the goal every loop; vision only refines that goal's aim.
+        HiveTarget selected = alliance.targetForY(pose.y(), TurretConfig.halfwayY);
         if (selected == null) {
-            visionStatus = poiSelected ? "POI tag does not belong to this alliance"
-                    : "Invalid pose / target selection";
+            visionStatus = "Invalid pose / target selection";
+            clearVision();
             return;
         }
         if (selected != target) {
@@ -390,15 +373,21 @@ public class Turret implements Mechanism {
             clearVision();
             pid.reset();
         }
-        double bearing = Calculations.bearing(pose.x(), pose.y(), pose.heading(), target);
-        targetDegrees = Calculations.reachableAngle(bearing, current,
-                TurretConfig.minDegrees, TurretConfig.maxDegrees);
-        visionStatus = Double.isFinite(targetDegrees) ? "Vision disabled for odometry test"
+        updateOdometrySetpoint(current, pose);
+        visionStatus = Double.isFinite(targetDegrees)
+                ? (odometryVisionEnabled ? "Odometry ready; evaluating vision" : "Vision disabled; odometry aim")
                 : "Odometry target outside turret limits / invalid pose";
     }
 
+    private void updateOdometrySetpoint(double current, Pose pose) {
+        // Convert the chassis-relative goal bearing to the encoder's reference.
+        targetDegrees = Calculations.reachableAngle(
+                odometryBearing(pose, target) - angleEstimator.getOffsetDegrees(), current,
+                TurretConfig.minDegrees, TurretConfig.maxDegrees);
+    }
+
     double calculatePower(double error, double velocityDegreesPerSecond) {
-        boolean moving = movingAimDegrees != null && !Double.isFinite(fixedDegrees);
+        boolean moving = movingAimDegrees != null;
         boolean trackingVision = visionTagId >= 0;
         gains.kP = trackingVision ? TurretConfig.visionP : TurretConfig.p;
         gains.kI = TurretConfig.i;
@@ -450,7 +439,7 @@ public class Turret implements Mechanism {
         return Math.max(-TurretConfig.maxPower, Math.min(TurretConfig.maxPower, output));
     }
 
-    private void updateVision(double current) {
+    private void updateVision(double current, Pose odometryPose) {
         limelight.setPipeline(TurretConfig.pipeline);
         LLResult result = limelight.getLatestResult();
         if (result == null) {
@@ -477,58 +466,10 @@ public class Turret implements Mechanism {
             clearVision();
             return;
         }
-        // Camera-only aiming always projects the opening from one tag's full 3D pose.
-        if (odometryTestPose == null || (testVisionEnabled && testTagGeometryEnabled)) {
-            updateTagGeometry(result, current, age);
-            return;
-        }
-        if (odometryTestPose != null && testVisionEnabled && testPointOfInterestTagId >= 0) {
-            updatePointOfInterest(result, current, age);
-            return;
-        }
-        double acquireDegrees = TurretConfig.acquireDegrees;
-        // Legacy raw-tag test mode retains its calibrated middle-tag offsets.
-        double firstError = Double.NaN;
-        double secondError = Double.NaN;
-        int matching = 0;
-        for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
-            int id = tag.getFiducialId();
-            if (id != target.firstAimTagId && id != target.secondAimTagId) continue;
-            matching++;
-            double txError = tag.getTargetXDegrees() - TurretConfig.desiredTx(target, id);
-            if (!Calculations.usableVision(target, id,
-                    result.getPipelineIndex(), TurretConfig.pipeline, age,
-                    TurretConfig.maxFrameAgeMs, txError, acquireDegrees)) continue;
-            if (id == target.firstAimTagId) firstError = txError;
-            else secondError = txError;
-        }
-        int selectedId = Calculations.selectVisionTag(target, visionTagId,
-                Double.isFinite(firstError), Double.isFinite(secondError));
-        if (selectedId < 0) {
-            if (visionPipeline != TurretConfig.pipeline) {
-                visionStatus = "Pipeline mismatch; expected " + TurretConfig.pipeline;
-            } else if (!Double.isFinite(age) || age < 0) {
-                visionStatus = "Invalid frame age";
-            } else if (age > TurretConfig.maxFrameAgeMs) {
-                visionStatus = "Frame too old; max " + TurretConfig.maxFrameAgeMs + " ms";
-            } else if (matching == 0) {
-                visionStatus = "No middle tags for " + target + "; expected "
-                        + target.firstAimTagId + " or " + target.secondAimTagId;
-            } else {
-                visionStatus = "Invalid tx/offset or outside acquisition window: "
-                        + acquireDegrees + " deg";
-            }
-            clearVision(); // Keep an odometry fallback if the test supplied one.
-            return;
-        }
-
-        double selectedError = selectedId == target.firstAimTagId ? firstError : secondError;
-        applyVisionMeasurement(current, result, selectedId, selectedError,
-                odometryTestPose == null ? "LIMELIGHT ONLY" : "ODOMETRY + LIMELIGHT",
-                "Tracking tag " + selectedId);
+        updateTagGeometry(result, current, age, odometryPose);
     }
 
-    private void updateTagGeometry(LLResult result, double current, double age) {
+    private void updateTagGeometry(LLResult result, double current, double age, Pose odometryPose) {
         if (result.getPipelineIndex() != TurretConfig.pipeline
                 || !Double.isFinite(age) || age < 0 || age > TurretConfig.maxFrameAgeMs) {
             visionStatus = result.getPipelineIndex() != TurretConfig.pipeline
@@ -537,100 +478,109 @@ public class Turret implements Mechanism {
             clearVision();
             return;
         }
-        int selectedId = -1;
-        HiveTarget selectedCell = null;
-        double selectedError = Double.NaN;
-        int bestRank = -1;
-        double bestArea = -1;
-        for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
-            int id = tag.getFiducialId();
-            HiveTarget cell = cellForTag(id);
-            if (cell == null) continue;
-            HiveAimGeometry.AimPoint point = HiveAimGeometry.fromTag(cell, id,
-                    tag.getTargetPoseCameraSpace());
-            if (point == null || !point.upright) continue;
-            // Individual 3D poses are unaffected by the camera's global POI setting.
-            double error = point.errorDegrees(tag.getTargetXDegrees());
-            if (!Calculations.usableVision(cell, id, result.getPipelineIndex(),
-                    TurretConfig.pipeline, age, TurretConfig.maxFrameAgeMs,
-                    error, TurretConfig.acquireDegrees)) continue;
-            double angle = Calculations.reachableAngle(current + TurretConfig.txToCcwSign * error,
-                    current, TurretConfig.minDegrees, TurretConfig.maxDegrees);
-            if (!Double.isFinite(angle)) continue;
-            // Retain one usable tag; otherwise prefer the current cell and a larger image.
-            int rank = id == visionTagId ? 2 : cell == target ? 1 : 0;
-            double area = Double.isFinite(tag.getTargetArea()) ? Math.max(0, tag.getTargetArea()) : 0;
-            if (rank > bestRank || (rank == bestRank && area > bestArea)) {
-                selectedId = id;
-                selectedCell = cell;
-                selectedError = error;
-                bestRank = rank;
-                bestArea = area;
-            }
-        }
-        if (selectedId < 0) {
-            visionStatus = "No usable upright 3D tag pose; check Full 3D/tag size/ID filter";
+        TagAim aim = selectTagAim(result, current, odometryPose != null);
+        if (aim == null) {
             clearVision();
             return;
         }
-        if (target != selectedCell) {
-            clearVision();
-        }
-        if (selectedId != visionTagId) {
+        if (odometryPose != null) correctOdometryAngle(current, age, odometryPose, aim);
+        if (target != aim.cell) clearVision();
+        if (aim.id != visionTagId) {
             pid.reset();
             visionSettled = false;
         }
-        target = selectedCell;
-        lastGeometryTarget = selectedCell;
-        applyVisionMeasurement(current, result, selectedId, selectedError,
-                odometryTestPose == null ? "LIMELIGHT 3D POI" : "ODOMETRY + LIMELIGHT 3D POI",
-                "Tracking cell opening from tag " + selectedId);
+        target = aim.cell;
+        applyVisionMeasurement(current, result, aim.id, aim.errorDegrees);
+        if (odometryPose != null && visionTagId >= 0) mode = "LIMELIGHT 3D + ODOMETRY FALLBACK";
     }
 
-    private void updatePointOfInterest(LLResult result, double current, double age) {
-        HiveTarget selected = cellForTag(testPointOfInterestTagId);
-        if (selected == null) {
-            visionStatus = "POI tag does not belong to this alliance";
-            clearVision();
-            return;
+    private TagAim selectTagAim(LLResult result, double current, boolean allowUnreachable) {
+        visionStatus = "No tags for " + (odometryPoseSupplier != null ? target : "this alliance");
+        boolean newFrame = isNewVisionFrame(result.getTimestamp(), result.getControlHubTimeStamp());
+        TagAim best = null;
+        for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
+            TagAim candidate = evaluateTagAim(tag, current, newFrame, allowUnreachable);
+            if (candidate == null) continue;
+            if (best == null || candidate.rank > best.rank
+                    || (candidate.rank == best.rank && candidate.area > best.area)) {
+                best = candidate;
+            }
         }
-        // LLResult has no primary-fiducial ID accessor. Require a single matching detection
-        // so pipeline tx cannot silently refer to a different tag with the wrong POI offset.
-        if (result.getFiducialResults().size() != 1
-                || result.getFiducialResults().get(0).getFiducialId() != testPointOfInterestTagId) {
-            visionStatus = "POI requires pipeline ID filter = " + testPointOfInterestTagId;
-            clearVision();
-            return;
+        return best;
+    }
+
+    private TagAim evaluateTagAim(LLResultTypes.FiducialResult tag, double current,
+                                  boolean newFrame, boolean allowUnreachable) {
+        int id = tag.getFiducialId();
+        HiveTarget cell = cellForTag(id);
+        if (cell == null || (odometryPoseSupplier != null && cell != target)) return null;
+        HiveAimGeometry.AimPoint point = HiveAimGeometry.fromTag(cell, id, tag.getTargetPoseCameraSpace());
+        if (point == null) {
+            visionStatus = "Tag " + id + ": no usable 3D pose";
+            return null;
         }
-        double error = result.getTx();
-        if (!Calculations.usableVision(selected, testPointOfInterestTagId,
-                result.getPipelineIndex(), TurretConfig.pipeline, age,
-                TurretConfig.maxFrameAgeMs, error, TurretConfig.acquireDegrees)) {
-            visionStatus = result.getPipelineIndex() != TurretConfig.pipeline
-                    ? "POI pipeline mismatch; expected " + TurretConfig.pipeline
-                    : !Double.isFinite(age) || age < 0 ? "Invalid frame age"
-                    : age > TurretConfig.maxFrameAgeMs ? "POI frame too old"
-                    : "Invalid POI tx or outside acquisition window";
-            clearVision();
-            return;
+        if (!point.upright) {
+            visionStatus = "Tag " + id + ": upside-down cell";
+            return null;
         }
-        target = selected;
-        applyVisionMeasurement(current, result, testPointOfInterestTagId,
-                error, "LIMELIGHT POI", "Tracking cell POI from tag " + testPointOfInterestTagId);
+        double error = point.errorDegrees();
+        if (!Double.isFinite(error) || !(Math.abs(error) <= TurretConfig.acquireDegrees)) {
+            visionStatus = "Tag " + id + ": invalid aim error / outside acquisition window";
+            return null;
+        }
+        double aimDegrees = current + TurretConfig.txToCcwSign * error;
+        if (!Double.isFinite(aimDegrees)) {
+            visionStatus = "Tag " + id + ": invalid encoder angle / configuration";
+            return null;
+        }
+        double candidateAim = odometryPoseSupplier != null && !newFrame && id == visionTagId
+                ? visionDegrees : aimDegrees;
+        boolean reachable = Double.isFinite(Calculations.reachableAngle(candidateAim, current,
+                TurretConfig.minDegrees, TurretConfig.maxDegrees));
+        if (!reachable && !allowUnreachable) {
+            visionStatus = "3D target outside turret limits";
+            return null;
+        }
+        // Reachable aim first, then tracked tag, current cell, and larger image.
+        int rank = (reachable ? 3 : 0) + (id == visionTagId ? 2 : cell == target ? 1 : 0);
+        double area = Double.isFinite(tag.getTargetArea()) ? Math.max(0, tag.getTargetArea()) : 0;
+        return new TagAim(id, cell, error, rank, area);
+    }
+
+    private void correctOdometryAngle(double current, double age, Pose odometryPose, TagAim aim) {
+        if (cellForTag(aim.id) != target || aim.cell != target) return;
+        angleEstimator.observe(aimUpdateTimeNanos, age,
+                odometryBearing(odometryPose, target), current,
+                TurretConfig.txToCcwSign * aim.errorDegrees);
+        // Keep the fallback ready; a usable camera target remains the primary aim.
+        updateOdometrySetpoint(current, odometryPose);
+    }
+
+    private static final class TagAim {
+        final int id;
+        final HiveTarget cell;
+        final double errorDegrees;
+        final int rank;
+        final double area;
+
+        TagAim(int id, HiveTarget cell, double errorDegrees, int rank, double area) {
+            this.id = id;
+            this.cell = cell;
+            this.errorDegrees = errorDegrees;
+            this.rank = rank;
+            this.area = area;
+        }
     }
 
     private void applyVisionMeasurement(double current, LLResult result, int selectedId,
-                                        double selectedError, String trackingMode, String status) {
+                                        double selectedError) {
         // Keep this camera measurement even if the encoder-based travel limits reject the target.
         visionErrorDegrees = selectedError;
+        visionRequestedDegrees = current + TurretConfig.txToCcwSign * selectedError;
         visionErrorTagId = selectedId;
         double timestamp = result.getTimestamp();
         long receiptTimestamp = result.getControlHubTimeStamp();
-        // The SDK returns zero when the legacy native timestamp is absent. In that
-        // case use the SDK's receive time so a newer result can refresh the target.
-        boolean newFrame = Double.isFinite(timestamp) && timestamp > 0
-                ? timestamp != visionTimestamp : receiptTimestamp != visionReceiptTimestamp;
-        if (newFrame || selectedId != visionTagId) {
+        if (isNewVisionFrame(timestamp, receiptTimestamp) || selectedId != visionTagId) {
             visionTimestamp = timestamp;
             visionReceiptTimestamp = receiptTimestamp;
             visionDegrees = Calculations.reachableAngle(
@@ -641,12 +591,18 @@ public class Turret implements Mechanism {
         if (Double.isFinite(visionDegrees)) {
             visionTagId = selectedId;
             targetDegrees = visionDegrees;
-            mode = trackingMode;
-            visionStatus = status;
+            mode = "LIMELIGHT 3D POI";
+            visionStatus = "Tracking cell opening from tag " + selectedId;
         } else {
             visionStatus = "Vision target outside turret limits / invalid correction";
             clearVision();
         }
+    }
+
+    private boolean isNewVisionFrame(double timestamp, long receiptTimestamp) {
+        // The SDK returns zero when the native timestamp is absent.
+        return Double.isFinite(timestamp) && timestamp > 0
+                ? timestamp != visionTimestamp : receiptTimestamp != visionReceiptTimestamp;
     }
 
     /** Status if this power would drive past a travel limit, otherwise null. */
@@ -683,17 +639,32 @@ public class Turret implements Mechanism {
     }
 
     public double getTargetDegrees() { return targetDegrees; }
+    /** Estimated physical angle relative to the chassis; getDegrees() remains the raw encoder reference. */
+    public double getChassisDegrees() { return angleEstimator.chassisDegrees(getDegrees()); }
+    public double getVisionChassisDegrees() { return angleEstimator.getVisionChassisDegrees(); }
+    public double getOdometryAngleOffsetDegrees() { return angleEstimator.getOffsetDegrees(); }
+    public boolean hasOdometryAimCorrection() { return angleEstimator.hasCorrection(); }
+    public String getOdometryCorrectionStatus() {
+        if (!TurretAngleEstimator.applyVisionCorrections || angleEstimator.hasCorrection()) {
+            return angleEstimator.getStatus();
+        }
+        if (!odometryVisionEnabled) return "Vision disabled; holding last angle correction";
+        if (visionErrorTagId < 0) return "Waiting for a usable 3D tag";
+        return angleEstimator.getStatus();
+    }
     public double getVelocityDegreesPerSecond() {
         return turretMotor == null || TurretConfig.ticksPerDegree == 0 ? Double.NaN
                 : turretMotor.getVelocity() / TurretConfig.ticksPerDegree;
     }
+    public Alliance getAlliance() { return alliance; }
     public HiveTarget getTarget() { return target; }
     public double getPower() { return turret == null ? 0 : turret.getThrottle(); }
     public int getVisionTagId() { return visionTagId; }
     public double getVisionErrorDegrees() { return visionErrorDegrees; }
+    public double getVisionRequestedDegrees() { return visionRequestedDegrees; }
     public int getVisionErrorTagId() { return visionErrorTagId; }
     public boolean isVisionAligned() {
-        return enabled && !manualControl && !Double.isFinite(fixedDegrees)
+        return enabled && !manualControl
                 && visionErrorTagId >= 0 && Double.isFinite(visionErrorDegrees)
                 && Math.abs(visionErrorDegrees) <= TurretConfig.toleranceDegrees;
     }

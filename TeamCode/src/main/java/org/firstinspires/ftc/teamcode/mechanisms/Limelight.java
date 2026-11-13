@@ -17,7 +17,6 @@ public class Limelight implements Mechanism {
         limelight.start();
     }
 
-    /** Switches the camera pipeline; only sends a request when the index changes. */
     public void setPipeline(int index) {
         if (limelight == null || index == pipeline) return;
         if (limelight.pipelineSwitch(index)) pipeline = index;
