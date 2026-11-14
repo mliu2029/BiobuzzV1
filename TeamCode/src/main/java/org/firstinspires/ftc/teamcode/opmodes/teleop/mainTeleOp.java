@@ -3,16 +3,16 @@ package org.firstinspires.ftc.teamcode.opmodes.teleop;
 import com.bylazar.configurables.annotations.Configurable;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
+import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.math.Pose;
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
 import org.firstinspires.ftc.teamcode.util.OpModeStorage;
+import org.firstinspires.ftc.teamcode.util.LoopTiming;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.util.Alliance;
-import org.firstinspires.ftc.teamcode.util.TurretConfig;
-import org.firstinspires.ftc.teamcode.mechanisms.Intake;
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer;
 import java.util.Locale;
 
@@ -30,6 +30,7 @@ public abstract class mainTeleOp extends NextOpMode {
 
     protected final Robot robot;
     private final Alliance alliance;
+    private final LoopTiming loopTiming;
     private boolean started;
     private boolean wasTransferOpen;
     private final TelemetryManager panelsTelemetry =
@@ -39,7 +40,12 @@ public abstract class mainTeleOp extends NextOpMode {
     private String poseResetStatus = "D2 D-pad Left at the marked pose" ;
 
     protected mainTeleOp(Robot robot, Alliance alliance) {
-        super(robot, BulkReadHook.INSTANCE);
+        this(robot, alliance, new LoopTiming());
+    }
+
+    private mainTeleOp(Robot robot, Alliance alliance, LoopTiming loopTiming) {
+        super(robot, BulkReadHook.INSTANCE, loopTiming);
+        this.loopTiming = loopTiming;
         this.robot = robot;
         this.alliance = alliance;
         resetMechanismControls();
@@ -115,7 +121,9 @@ public abstract class mainTeleOp extends NextOpMode {
     }
 
     protected void startTurretAim() {
-        robot.Turret().aimTurret.schedule();
+        Follower follower = robot.Drivetrain().getFollower();
+        robot.Turret().useOdometryAim(follower::pose, follower::velocity);
+        robot.Turret().setOdometryVisionEnabled(true);
     }
 
     protected void updateTurretAim() { }
@@ -193,12 +201,11 @@ public abstract class mainTeleOp extends NextOpMode {
         if (Double.isFinite(shooterVelocity) && shooterVelocity > 0) {
             shooterPresetVelocity = shooterVelocity;
         }
-        robot.Intake().setVelocity(runIntake
-                ? (reverseIntake ? -1 : 1) * Intake.DEFAULT_TARGET_VELOCITY : 0);
+        robot.Intake().setPower(runIntake ? (reverseIntake ? -1 : 1) : 0);
         if (telemetryDue(System.nanoTime())) updateDriverTelemetry();
     }
 
-    private boolean telemetryDue(long now) {
+    protected final boolean telemetryDue(long now) {
         if (lastTelemetryNanos != 0
                 && now - lastTelemetryNanos < TELEMETRY_INTERVAL_MS * 1_000_000L) return false;
         lastTelemetryNanos = now;
@@ -208,46 +215,24 @@ public abstract class mainTeleOp extends NextOpMode {
     private void updateDriverTelemetry() {
         double turretDegrees = robot.Turret().getDegrees();
         double turretTarget = robot.Turret().getTargetDegrees();
-        int selectedTag = robot.Turret().getVisionTagId();
-        addDriverData("Alliance", getAlliance());
+        addDriverData("Loop ms (avg / p95 / max; last 256)", loopTiming.summary());
+        addDriverData("Alliance / aim", getAlliance() + " / " + robot.Turret().getMode());
         addDriverData("Pose reset", poseResetStatus);
-        addDriverData("Aim", robot.Turret().getMode()
-                + (robot.Turret().isAligned() ? " | ENCODER ALIGNED" : " | ENCODER NOT ALIGNED"));
         addDriverData("Turret motion", robot.Turret().getMotionStatus());
         addDriverData("Vision", robot.Turret().getVisionStatus());
-        int errorTag = robot.Turret().getVisionErrorTagId();
-        addDriverData("Vision aim (tag; error deg)", errorTag < 0 ? "NO USABLE TAG"
-                : errorTag + "; " + oneDecimal(robot.Turret().getVisionErrorDegrees())
-                + (robot.Turret().isVisionAligned() ? " | ALIGNED" : " | NOT ALIGNED"));
-        addDriverData("Tags (seen / tracking)", robot.Turret().getVisionTags()
-                + " / " + (selectedTag < 0 ? "none" : selectedTag));
-        addDriverData("Camera (pipeline / expected; age)", robot.Turret().getVisionPipeline()
-                + " / " + TurretConfig.pipeline + "; "
-                + oneDecimal(robot.Turret().getVisionFrameAgeMs()) + " ms");
-        double cameraTimestamp = robot.Turret().getVisionTimestamp();
-        addDriverData("Camera frame timestamp", Double.isFinite(cameraTimestamp)
-                ? oneDecimal(cameraTimestamp) + (cameraTimestamp > 0 ? " ms" : " (using hub receive time)")
-                : robot.Turret().getVisionTagId() >= 0 ? "Invalid; using hub receive time" : "No tracked frame");
-        addDriverData("Turret (deg actual / target / error)", oneDecimal(turretDegrees)
+        int tag = robot.Turret().getVisionErrorTagId();
+        addDriverData("Vision tag / error / age", tag < 0 ? "No usable tag"
+                : tag + " / " + oneDecimal(robot.Turret().getVisionErrorDegrees()) + " deg / "
+                        + oneDecimal(robot.Turret().getVisionFrameAgeMs()) + " ms");
+        addDriverData("Turret deg (actual / target / error)", oneDecimal(turretDegrees)
                 + " / " + oneDecimal(turretTarget) + " / " + oneDecimal(turretTarget - turretDegrees));
-        addDriverData("Turret (cmd / encoder)", String.format(Locale.US, "%.0f%% / %d ticks",
-                robot.Turret().getPower() * 100, robot.Turret().getEncoderTicks()));
-        addDriverData("Recenter (old deg -> 0; count)", robot.Turret().getRecenterCount() == 0 ? "None yet"
-                : String.format(Locale.US, "%+.1f -> 0; %d", robot.Turret().getLastRecenterDegrees(),
-                        robot.Turret().getRecenterCount()));
-        addDriverData("Shooter (ticks/s actual / target)", String.format(Locale.US, "%.0f / %.0f",
+        addDriverData("Turret cmd / encoder / recenter count", String.format(Locale.US,
+                "%.0f%% / %d ticks / %d", robot.Turret().getPower() * 100,
+                robot.Turret().getEncoderTicks(), robot.Turret().getRecenterCount()));
+        addDriverData("Shooter speed (actual / target)", String.format(Locale.US, "%.0f / %.0f",
                 robot.Shooter().getFlywheelVelocity(), robot.Shooter().getTargetVelocity()));
-        addDriverData("Shooter (control / cmd)", robot.Shooter().getControlStatus()
-                + String.format(Locale.US, " / %.0f%%", robot.Shooter().getFlywheelPower() * 100));
-        addDriverData("Intake (state / cmd)", robot.Intake().getStatus()
-                + String.format(Locale.US, " / %.0f%%", robot.Intake().getPower() * 100));
-        addDriverData("Intake (ticks/s actual / target)", String.format(Locale.US, "%.0f / %.0f",
-                robot.Intake().getVelocity(), robot.Intake().getTargetVelocity()));
-        addDriverData("Transfer", robot.Transfer().getStatus());
-        addDriverData("Ramp command", robot.Ramp().getStatus());
-        addDriverData("Rollers (ticks/s actual / target; cmd)", String.format(Locale.US, "%.0f / %.0f; %.0f%%",
-                robot.Transfer().getRollerVelocity(), robot.Transfer().getCommandedRollerVelocity(),
-                robot.Transfer().getRollerPower() * 100));
+        addDriverData("Intake / transfer", robot.Intake().getStatus() + " / " + robot.Transfer().getStatus());
+        addDriverData("Ramp", robot.Ramp().getStatus());
         addAdditionalDriverTelemetry();
         panelsTelemetry.update();
         telemetry.update();

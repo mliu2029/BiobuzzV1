@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.opmodes.auto;
+package org.firstinspires.ftc.teamcode.opmodes.auto.core;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
@@ -7,16 +7,25 @@ import dev.nextftc.robot.opmode.NextOpMode;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 import org.firstinspires.ftc.teamcode.util.OpModeStorage;
+import org.firstinspires.ftc.teamcode.util.LoopTiming;
 
 public abstract class BaseAuto extends NextOpMode {
     private final Robot robot;
     private Follower follower;
     protected final AutoCommands commands;
     private String currentPath = "Ready";
+    private final LoopTiming loopTiming;
+    private long lastTelemetryNanos;
 
     protected BaseAuto(Robot robot) {
-        super(robot, BulkReadHook.INSTANCE);
+        this(robot, new LoopTiming());
+    }
+
+    private BaseAuto(Robot robot, LoopTiming loopTiming) {
+        super(robot, BulkReadHook.INSTANCE, loopTiming);
         this.robot = robot;
+        this.loopTiming = loopTiming;
+        telemetry.setMsTransmissionInterval(200);
         commands = new AutoCommands(robot, status -> currentPath = status);
         telemetry.addData("Status", "Ready");
         telemetry.update();
@@ -30,6 +39,7 @@ public abstract class BaseAuto extends NextOpMode {
         follower.setPose(startPose);
         OpModeStorage.saveAutonomousEndPose(startPose);
         follower.update();
+        lastTelemetryNanos = 0;
     }
 
     @Override
@@ -39,11 +49,14 @@ public abstract class BaseAuto extends NextOpMode {
         if (!Thread.currentThread().isInterrupted()) {
             OpModeStorage.saveAutonomousEndPose(follower.pose());
         }
-        telemetry.addData("Current Path", currentPath);
-        telemetry.addData("X", follower.pose().x());
-        telemetry.addData("Y", follower.pose().y());
-        telemetry.addData("Heading (degrees)", Math.toDegrees(follower.pose().heading()));
-        telemetry.addData("Follower Mode", follower.mode());
+        long now = System.nanoTime();
+        if (lastTelemetryNanos != 0 && now - lastTelemetryNanos < 200_000_000L) return;
+        lastTelemetryNanos = now;
+        Pose pose = follower.pose();
+        telemetry.addData("Path", currentPath);
+        telemetry.addData("Pose (in / deg)", "%.1f / %.1f / %.1f",
+                pose.x(), pose.y(), Math.toDegrees(pose.heading()));
+        telemetry.addData("Loop ms (avg / p95 / max; last 256)", loopTiming.summary());
         telemetry.update();
     }
 

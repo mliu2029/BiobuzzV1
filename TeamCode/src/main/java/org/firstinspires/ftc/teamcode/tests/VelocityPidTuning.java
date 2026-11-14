@@ -6,9 +6,8 @@ import com.bylazar.telemetry.TelemetryManager;
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.opmode.NextTeleop;
-import java.util.Locale;
+import org.firstinspires.ftc.teamcode.util.LoopTiming;
 import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.mechanisms.Intake;
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter;
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer;
 
@@ -25,25 +24,28 @@ public class VelocityPidTuning extends NextOpMode {
     public static volatile double rollerD = Transfer.DEFAULT_ROLLER_D;
     public static volatile double rollerF = Transfer.DEFAULT_ROLLER_F;
     public static volatile double rollerTargetVelocity = Transfer.DEFAULT_ROLLER_TARGET_VELOCITY;
-    public static volatile double intakeP = Intake.DEFAULT_P;
-    public static volatile double intakeI = Intake.DEFAULT_I;
-    public static volatile double intakeD = Intake.DEFAULT_D;
-    public static volatile double intakeF = Intake.DEFAULT_F;
-    public static volatile double intakeTargetVelocity = Intake.DEFAULT_TARGET_VELOCITY;
     public static volatile boolean runIntake = false;
     public static volatile boolean openTransfer = false;
 
     private final Robot robot;
     private boolean started;
     private boolean wasTransferOpen;
+    private long lastTelemetryNanos;
+    private final LoopTiming loopTiming;
     private final TelemetryManager panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
     public VelocityPidTuning(Robot robot) {
-        super(robot, BulkReadHook.INSTANCE);
+        this(robot, new LoopTiming());
+    }
+
+    private VelocityPidTuning(Robot robot, LoopTiming loopTiming) {
+        super(robot, BulkReadHook.INSTANCE, loopTiming);
         this.robot = robot;
+        this.loopTiming = loopTiming;
         runIntake = false;
         openTransfer = false;
-        panelsTelemetry.setUpdateInterval(50);
+        panelsTelemetry.setUpdateInterval(100);
+        telemetry.setMsTransmissionInterval(100);
         panelsTelemetry.addLine("Ready - press START");
         panelsTelemetry.update(telemetry);
     }
@@ -54,6 +56,7 @@ public class VelocityPidTuning extends NextOpMode {
         runIntake = false;
         openTransfer = false;
         wasTransferOpen = false;
+        lastTelemetryNanos = 0;
         started = true;
     }
 
@@ -64,15 +67,18 @@ public class VelocityPidTuning extends NextOpMode {
         robot.Transfer().setRollerPIDFCoefficients(rollerP, rollerI, rollerD, rollerF);
         robot.Transfer().setRollerVelocity(rollerTargetVelocity);
 
-        robot.Intake().setPIDFCoefficients(intakeP, intakeI, intakeD, intakeF);
         if (openTransfer && !wasTransferOpen) {
             runIntake = true;
             robot.Intake().restart();
         }
         wasTransferOpen = openTransfer;
-        robot.Intake().setVelocity(runIntake ? intakeTargetVelocity : 0);
+        robot.Intake().setPower(runIntake ? 1 : 0);
         robot.Transfer().setFeeding(openTransfer);
         robot.Shooter().setVelocity(targetVelocity);
+        long now = System.nanoTime();
+        if (lastTelemetryNanos != 0 && now - lastTelemetryNanos < 100_000_000L) return;
+        lastTelemetryNanos = now;
+        panelsTelemetry.addData("Loop ms (avg / p95 / max; last 256)", loopTiming.summary());
         panelsTelemetry.addData("Target Velocity (rad/s)", robot.Shooter().isEnabled()
                 ? robot.Shooter().getTargetVelocity() : 0.0);
         panelsTelemetry.addData("Flywheel Velocity (rad/s)", robot.Shooter().getFlywheelVelocity());
@@ -80,20 +86,7 @@ public class VelocityPidTuning extends NextOpMode {
         panelsTelemetry.addData("Roller Velocity (rad/s)", robot.Transfer().getRollerVelocity());
         panelsTelemetry.addData("Flywheel Power", robot.Shooter().getFlywheelPower());
         panelsTelemetry.addData("Roller Power", robot.Transfer().getRollerPower());
-        panelsTelemetry.addData("Intake Target Velocity (rad/s)", robot.Intake().getTargetVelocity());
-        panelsTelemetry.addData("Intake Velocity (rad/s)", robot.Intake().getVelocity());
-        panelsTelemetry.addData("Intake Power", robot.Intake().getPower());
         panelsTelemetry.addData("Transfer", robot.Transfer().getStatus());
-        panelsTelemetry.addData("Transfer Servo Position", Transfer.servoFreeMode
-                ? "Disabled" : robot.Transfer().getPosition());
-        panelsTelemetry.addLine(String.format(Locale.US,
-                "Shooter PIDF | P: %.5f, I: %.5f, D: %.5f, F: %.5f", p, i, d, f));
-        panelsTelemetry.addLine(String.format(Locale.US,
-                "Roller PIDF | P: %.5f, I: %.5f, D: %.5f, F: %.5f",
-                rollerP, rollerI, rollerD, rollerF));
-        panelsTelemetry.addLine(String.format(Locale.US,
-                "Intake PIDF | P: %.5f, I: %.5f, D: %.5f, F: %.5f",
-                intakeP, intakeI, intakeD, intakeF));
         panelsTelemetry.update(telemetry);
     }
 

@@ -1,0 +1,149 @@
+{
+  "version": "2.0.0",
+  "timestamp": "2026-11-14T17:13:49.397960+00:00",
+  "startPoint": {
+    "x": 53.0036,
+    "y": 6.0788,
+    "locked": false,
+    "headingDeg": 90.0
+  },
+  "lines": [
+    {
+      "id": "partner-close-start-far-hive-close-park-1",
+      "name": "Carry preload to far hive",
+      "color": "#4e79a7",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 58.878,
+        "y": 128.2045
+      },
+      "controlPoints": [
+        {
+          "x": 24.0,
+          "y": 38.0
+        },
+        {
+          "x": 25.0,
+          "y": 103.0
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 90.0,
+        "endDeg": 270.0
+      }
+    },
+    {
+      "id": "partner-close-start-far-hive-close-park-2",
+      "name": "Park close",
+      "color": "#f28e2b",
+      "locked": false,
+      "waitBeforeMs": 2000,
+      "waitAfterMs": 0,
+      "waitBeforeName": "Shoot far preload (illustrative dwell)",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 12.71,
+        "y": 93.61
+      },
+      "controlPoints": [
+        {
+          "x": 30,
+          "y": 102
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 0.0
+      }
+    }
+  ],
+  "shapes": [
+    {
+      "id": "triangle-1",
+      "name": "Red Goal",
+      "vertices": [
+        {
+          "x": 141.5,
+          "y": 70
+        },
+        {
+          "x": 141.5,
+          "y": 141.5
+        },
+        {
+          "x": 118.3,
+          "y": 141.5
+        },
+        {
+          "x": 135.5,
+          "y": 118
+        },
+        {
+          "x": 136.3,
+          "y": 70.2
+        }
+      ],
+      "color": "#dc2626",
+      "fillColor": "#ff6b6b"
+    },
+    {
+      "id": "triangle-2",
+      "name": "Blue Goal",
+      "vertices": [
+        {
+          "x": 6.2,
+          "y": 116.9
+        },
+        {
+          "x": 25,
+          "y": 141.5
+        },
+        {
+          "x": 0,
+          "y": 141.5
+        },
+        {
+          "x": 0,
+          "y": 70
+        },
+        {
+          "x": 6,
+          "y": 70
+        }
+      ],
+      "color": "#2563eb",
+      "fillColor": "#60a5fa"
+    }
+  ],
+  "sequence": [
+    {
+      "kind": "path",
+      "lineId": "partner-close-start-far-hive-close-park-1"
+    },
+    {
+      "kind": "path",
+      "lineId": "partner-close-start-far-hive-close-park-2"
+    }
+  ],
+  "fieldPoints": [],
+  "robot": {
+    "forwardVelocity": 60.41705206731583,
+    "strafeVelocity": 47.33137369422454,
+    "aVelocity": 3.141592653589793,
+    "kFriction": 0.1,
+    "rLength": 14,
+    "rWidth": 12,
+    "safetyMargin": 1,
+    "maxAcceleration": 30,
+    "maxDeceleration": 30
+  },
+  "activePaths": []
+}

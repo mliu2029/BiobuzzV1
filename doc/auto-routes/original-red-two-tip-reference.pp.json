@@ -1,0 +1,357 @@
+{
+  "version": "2.0.0",
+  "timestamp": "2026-11-14T16:27:52.479Z",
+  "startPoint": {
+    "x": 53.00355169067452,
+    "y": 6.078796678687645,
+    "locked": false,
+    "headingDeg": 90
+  },
+  "lines": [
+    {
+      "id": "line-mvmy7onc-c5yweg",
+      "color": "#ffc516",
+      "name": "Path 1",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 6.587910966705778,
+        "y": 16.296053057233024
+      },
+      "controlPoints": [
+        {
+          "x": 30.722294702858353,
+          "y": 33.536743173786654
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 90,
+        "endDeg": 270
+      }
+    },
+    {
+      "id": "line-mvvoxnia-fsfrcf",
+      "color": "#b07aa1",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 6.469031625323837,
+        "y": 7.349972417523083
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "constant",
+        "reverse": true,
+        "degrees": 270,
+        "startDeg": 0,
+        "endDeg": 0,
+        "piecewiseHeading": {
+          "segments": [
+            {
+              "startProgress": 0,
+              "endProgress": 1,
+              "interpolationType": "linear",
+              "reversed": false,
+              "parameters": {
+                "startDeg": 0,
+                "endDeg": 0
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "line-mvmyc569-jlh01g",
+      "color": "#6A9697",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 58.87802690582959,
+        "y": 128.20448430493272
+      },
+      "controlPoints": [
+        {
+          "x": 23.003587443946195,
+          "y": 98.11659192825113
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "reverse": true,
+        "startDeg": 270,
+        "endDeg": 270
+      }
+    },
+    {
+      "id": "line-mvmyd4ti-b0wa9r",
+      "color": "#66997A",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 46.75,
+        "y": 118.75
+      },
+      "controlPoints": [
+        {
+          "x": 51.43677130044843,
+          "y": 113.84843049327354
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "reverse": true,
+        "startDeg": 270,
+        "endDeg": 90
+      }
+    },
+    {
+      "id": "line-mvmyefya-4e628h",
+      "color": "#5A68CC",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 47.23811659192825,
+        "y": 132.32152466367714
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "constant",
+        "reverse": false,
+        "degrees": 90
+      }
+    },
+    {
+      "id": "line-mvmyfls8-x1etyy",
+      "color": "#699BB8",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 23.450672645739914,
+        "y": 47.16681614349776
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "linear",
+        "reverse": true,
+        "startDeg": 90,
+        "endDeg": 180
+      }
+    },
+    {
+      "id": "line-mvmyg20y-yd2e49",
+      "color": "#6AC5BC",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 11.494952678913107,
+        "y": 46.866175306931524
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "constant",
+        "reverse": true,
+        "degrees": 180
+      }
+    },
+    {
+      "id": "line-mvmygf5w-7nvyv2",
+      "color": "#86D9D5",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 56.85784753363229,
+        "y": 128.99596412556053
+      },
+      "controlPoints": [
+        {
+          "x": 28.7152466367713,
+          "y": 98.35560538116593
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "reverse": true,
+        "degrees": 0,
+        "startDeg": 180,
+        "endDeg": 270
+      }
+    },
+    {
+      "id": "line-mvmyh2ms-lt1e6m",
+      "color": "#A87975",
+      "name": "",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 11.983856502242146,
+        "y": 116.31569506726457
+      },
+      "controlPoints": [
+        {
+          "x": 40.27802690582959,
+          "y": 111.08206278026907
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "reverse": true,
+        "startDeg": 270,
+        "endDeg": 0
+      }
+    }
+  ],
+  "shapes": [
+    {
+      "id": "triangle-1",
+      "name": "Red Goal",
+      "vertices": [
+        {
+          "x": 141.5,
+          "y": 70
+        },
+        {
+          "x": 141.5,
+          "y": 141.5
+        },
+        {
+          "x": 118.3,
+          "y": 141.5
+        },
+        {
+          "x": 135.5,
+          "y": 118
+        },
+        {
+          "x": 136.3,
+          "y": 70.2
+        }
+      ],
+      "color": "#dc2626",
+      "fillColor": "#ff6b6b"
+    },
+    {
+      "id": "triangle-2",
+      "name": "Blue Goal",
+      "vertices": [
+        {
+          "x": 6.2,
+          "y": 116.9
+        },
+        {
+          "x": 25,
+          "y": 141.5
+        },
+        {
+          "x": 0,
+          "y": 141.5
+        },
+        {
+          "x": 0,
+          "y": 70
+        },
+        {
+          "x": 6,
+          "y": 70
+        }
+      ],
+      "color": "#2563eb",
+      "fillColor": "#60a5fa"
+    }
+  ],
+  "sequence": [
+    {
+      "kind": "path",
+      "lineId": "line-mvmy7onc-c5yweg"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvvoxnia-fsfrcf"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvmyc569-jlh01g"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvmyd4ti-b0wa9r"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvmyefya-4e628h"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvmyfls8-x1etyy"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvmyg20y-yd2e49"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvmygf5w-7nvyv2"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-mvmyh2ms-lt1e6m"
+    }
+  ],
+  "fieldPoints": [],
+  "robot": {
+    "forwardVelocity": 60.41705206731583,
+    "strafeVelocity": 47.33137369422454,
+    "aVelocity": 3.141592653589793,
+    "kFriction": 0.1,
+    "rLength": 14,
+    "rWidth": 12,
+    "safetyMargin": 1,
+    "maxAcceleration": 30,
+    "maxDeceleration": 30
+  },
+  "activePaths": []
+}

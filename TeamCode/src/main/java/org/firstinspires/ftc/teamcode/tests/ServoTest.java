@@ -25,6 +25,7 @@ public class ServoTest extends OpMode {
     private Servo ramp1;
     private Servo ramp2;
     private DcMotorEx intake;
+    private long lastTelemetryNanos;
     private final TelemetryManager panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
     @Override
@@ -32,7 +33,8 @@ public class ServoTest extends OpMode {
         rampUp = false;
         rampDown = false;
         runIntake = false;
-        panelsTelemetry.setUpdateInterval(50);
+        panelsTelemetry.setUpdateInterval(200);
+        telemetry.setMsTransmissionInterval(200);
         panelsTelemetry.update(telemetry);
     }
 
@@ -50,6 +52,7 @@ public class ServoTest extends OpMode {
         servo.setDirection(Servo.Direction.FORWARD);
         ramp1.setDirection(Servo.Direction.FORWARD);
         ramp2.setDirection(Servo.Direction.FORWARD);
+        lastTelemetryNanos = 0;
         loop();
     }
 
@@ -77,13 +80,12 @@ public class ServoTest extends OpMode {
                     ? Math.max(0.0, Math.min(1.0, requestedIntakePower)) : 0.0);
         }
 
-        panelsTelemetry.addData("Requested Position", requestedPosition);
+        long now = System.nanoTime();
+        if (lastTelemetryNanos != 0 && now - lastTelemetryNanos < 200_000_000L) return;
+        lastTelemetryNanos = now;
         panelsTelemetry.addData("Servo Position", servo.getPosition());
-        panelsTelemetry.addData("Ramp 1 Requested Position", ramp1Requested);
         panelsTelemetry.addData("Ramp 1 Position", ramp1.getPosition());
-        panelsTelemetry.addData("Ramp 2 Requested Position", ramp2Requested);
         panelsTelemetry.addData("Ramp 2 Position", ramp2.getPosition());
-        panelsTelemetry.addData("Intake Running", intake != null && intake.getPower() > 0);
         panelsTelemetry.addData("Intake Power", intake == null ? 0 : intake.getPower());
         panelsTelemetry.update(telemetry);
     }

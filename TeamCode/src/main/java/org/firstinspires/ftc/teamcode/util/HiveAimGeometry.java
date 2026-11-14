@@ -11,7 +11,8 @@ public final class HiveAimGeometry {
 
     private static final double[] TAG_X_INCHES = {-6.5, -2.75, 2.75, 6.5};
     private static final double TOP_METERS = 7.1875 * 0.0254;
-    private static final double DEPTH_METERS = 5.622 * 0.0254;
+    // Area centroid of the main opening cutout in the front rim plane, measured from hive CAD.
+    private static final double DEPTH_METERS = 5.76136 * 0.0254;
 
     public static final class AimPoint {
         public final double rightMeters;
@@ -40,8 +41,8 @@ public final class HiveAimGeometry {
         double roll = angles.getRoll(AngleUnit.RADIANS);
         double pitch = angles.getPitch(AngleUnit.RADIANS);
         double yaw = angles.getYaw(AngleUnit.RADIANS);
-        double[] values = {p.x, p.y, p.z, roll, pitch, yaw};
-        for (double value : values) if (!Double.isFinite(value)) return null;
+        if (!Double.isFinite(p.x) || !Double.isFinite(p.y) || !Double.isFinite(p.z)
+                || !Double.isFinite(roll) || !Double.isFinite(pitch) || !Double.isFinite(yaw)) return null;
         if (p.z <= 1e-6) return null;
 
         double sr = Math.sin(roll), cr = Math.cos(roll);

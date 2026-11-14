@@ -49,7 +49,6 @@ public class Turret implements Mechanism {
     private long visionReceiptTimestamp = Long.MIN_VALUE;
     private double visionDegrees = Double.NaN;
     private int visionTagId = -1;
-    private boolean visionSettled;
     private String mode = "OFF";
     private String visionStatus = "Auto aim off";
     private double visionFrameAgeMs = Double.NaN;
@@ -61,6 +60,13 @@ public class Turret implements Mechanism {
     private String motionStatus = "Auto aim off";
     private double lastRecenterDegrees = Double.NaN;
     private int recenterCount;
+    // Geometry belongs to a camera frame; setpoint/limit checks still run every loop.
+    private double geometryTimestamp = Double.NaN;
+    private long geometryReceiptTimestamp = Long.MIN_VALUE;
+    private int geometryPipeline = -1;
+    private Alliance geometryAlliance;
+    private TagAim[] frameAims = new TagAim[0];
+    private String frameTags = "[]";
 
     public final Command aimTurret = instant(this::resumeAutoAim);
     public final Command stopTurret = instant(this::stopImmediately);
@@ -176,6 +182,7 @@ public class Turret implements Mechanism {
         movingAimDegrees = null;
         movingAimRate = null;
         odometryVisionEnabled = false;
+        geometryPipeline = -1;
         this.startingDegrees = Double.isFinite(startingDegrees) ? startingDegrees : 0.0;
         encoderZeroTicks = 0;
         turretMotor = hardwareMap.get(DcMotorImplEx.class, "turret");
@@ -204,6 +211,7 @@ public class Turret implements Mechanism {
         resetVisionDiagnostics("Auto aim off");
         pid.reset();
         applyPower(0);
+        if (turret != null) turret.update();
     }
 
     /** Drop the current setpoint and camera lock so the next loop re-acquires from scratch. */
@@ -220,7 +228,6 @@ public class Turret implements Mechanism {
         visionReceiptTimestamp = Long.MIN_VALUE;
         visionDegrees = Double.NaN;
         visionTagId = -1;
-        visionSettled = false;
     }
 
     private void resetVisionDiagnostics(String status) {
@@ -291,8 +298,7 @@ public class Turret implements Mechanism {
         }
         double velocityDegreesPerSecond = getVelocityDegreesPerSecond();
         double output = calculatePower(targetDegrees - current, velocityDegreesPerSecond);
-        motionStatus = visionSettled ? "Vision settled; motor braking"
-                : visionTagId >= 0 && isAligned() && !isVisionAligned()
+        motionStatus = visionTagId >= 0 && isAligned() && !isVisionAligned()
                         ? "Encoder target reached; camera still off"
                 : isAligned() ? "Encoder aligned; PID holding" : "Aiming";
         if (!Double.isFinite(output)) motionStatus = "Invalid PID output; stopped";
@@ -392,48 +398,25 @@ public class Turret implements Mechanism {
         gains.kP = trackingVision ? TurretConfig.visionP : TurretConfig.p;
         gains.kI = TurretConfig.i;
         gains.kD = TurretConfig.d;
-        if (!Double.isFinite(error)) {
-            visionSettled = false;
+        if (!Double.isFinite(error) || !Double.isFinite(velocityDegreesPerSecond)) {
             pid.reset();
             return Double.NaN;
         }
-        if (trackingVision) {
-            double settle = TurretConfig.visionSettleDegrees;
-            double resume = TurretConfig.visionResumeDegrees;
-            if (!Double.isFinite(velocityDegreesPerSecond) || !Double.isFinite(settle)
-                    || !Double.isFinite(resume) || settle < 0 || resume < settle) {
-                visionSettled = false;
-                pid.reset();
-                return Double.NaN;
-            }
-            // Separate enter/exit bands prevent noisy frames from repeatedly reversing kS.
-            double threshold = visionSettled ? resume : settle;
-            visionSettled = Math.abs(error) <= threshold
-                    && Double.isFinite(visionErrorDegrees)
-                    && Math.abs(visionErrorDegrees) <= threshold;
-            if (visionSettled) {
-                pid.reset();
-                return 0;
-            }
-        } else {
-            visionSettled = false;
-        }
+        // Keep correcting toward zero error, including inside the alignment tolerance.
         // Camera updates move the reference abruptly. D should damp encoder motion,
         // rather than amplify those reference jumps as if the turret had moved.
         double rate = moving ? movingAimRate.getAsDouble() : 0;
-        if (moving && (!Double.isFinite(rate) || !Double.isFinite(velocityDegreesPerSecond)
+        if (moving && (!Double.isFinite(rate)
                 || !Double.isFinite(TurretConfig.movingVelocityFeedforward)
                 || TurretConfig.movingVelocityFeedforward < 0)) {
             pid.reset();
             return Double.NaN;
         }
-        double output = moving
-                ? pid.calculateFromReference(error, 0, rate, velocityDegreesPerSecond)
-                : trackingVision
-                ? pid.calculateFromReference(error, 0, 0, velocityDegreesPerSecond)
-                : pid.calculate(error);
+        double output = pid.calculateFromReference(error, 0, rate, velocityDegreesPerSecond);
         if (moving) output += rate * TurretConfig.movingVelocityFeedforward;
-        output += Math.signum(error) * TurretConfig.staticPower;
+        // Fade the friction kick smoothly through zero instead of flipping full power.
+        double staticScale = Math.max(-1, Math.min(1, error / TurretConfig.staticPowerRampDegrees));
+        output += staticScale * TurretConfig.staticPower;
         // Counterclockwise is positive.
         output *= Math.signum(TurretConfig.ticksPerDegree);
         return Math.max(-TurretConfig.maxPower, Math.min(TurretConfig.maxPower, output));
@@ -452,14 +435,6 @@ public class Turret implements Mechanism {
         double age = result.getStaleness() + result.getCaptureLatency() + result.getTargetingLatency();
         visionFrameAgeMs = age;
         visionPipeline = result.getPipelineIndex();
-        StringBuilder tags = new StringBuilder("[");
-        if (result.getFiducialResults() != null) {
-            for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
-                if (tags.length() > 1) tags.append(", ");
-                tags.append(tag.getFiducialId());
-            }
-        }
-        visionTags = tags.append(']').toString();
         if (!result.isValid() || result.getFiducialResults() == null) {
             visionStatus = !result.isValid() ? "Camera result invalid / no target"
                     : "No AprilTag results";
@@ -485,66 +460,89 @@ public class Turret implements Mechanism {
         }
         if (odometryPose != null) correctOdometryAngle(current, age, odometryPose, aim);
         if (target != aim.cell) clearVision();
-        if (aim.id != visionTagId) {
-            pid.reset();
-            visionSettled = false;
-        }
+        if (aim.id != visionTagId) pid.reset();
         target = aim.cell;
         applyVisionMeasurement(current, result, aim.id, aim.errorDegrees);
         if (odometryPose != null && visionTagId >= 0) mode = "LIMELIGHT 3D + ODOMETRY FALLBACK";
     }
 
+    private void cacheTagGeometry(LLResult result) {
+        double timestamp = result.getTimestamp();
+        long receiptTimestamp = result.getControlHubTimeStamp();
+        boolean sameFrame = Double.isFinite(timestamp) && timestamp > 0
+                ? timestamp == geometryTimestamp : receiptTimestamp == geometryReceiptTimestamp;
+        if (sameFrame && geometryPipeline == result.getPipelineIndex()
+                && geometryAlliance == alliance) return;
+        geometryTimestamp = timestamp;
+        geometryReceiptTimestamp = receiptTimestamp;
+        geometryPipeline = result.getPipelineIndex();
+        geometryAlliance = alliance;
+        frameAims = new TagAim[result.getFiducialResults().size()];
+        StringBuilder tags = new StringBuilder("[");
+        int index = 0;
+        for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
+            int id = tag.getFiducialId();
+            if (tags.length() > 1) tags.append(", ");
+            tags.append(id);
+            HiveTarget cell = cellForTag(id);
+            if (cell == null) continue;
+            HiveAimGeometry.AimPoint point =
+                    HiveAimGeometry.fromTag(cell, id, tag.getTargetPoseCameraSpace());
+            double area = Double.isFinite(tag.getTargetArea()) ? Math.max(0, tag.getTargetArea()) : 0;
+            frameAims[index++] = new TagAim(id, cell, point, area);
+        }
+        frameTags = tags.append(']').toString();
+    }
+
     private TagAim selectTagAim(LLResult result, double current, boolean allowUnreachable) {
+        cacheTagGeometry(result);
+        visionTags = frameTags;
         visionStatus = "No tags for " + (odometryPoseSupplier != null ? target : "this alliance");
         boolean newFrame = isNewVisionFrame(result.getTimestamp(), result.getControlHubTimeStamp());
         TagAim best = null;
-        for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
-            TagAim candidate = evaluateTagAim(tag, current, newFrame, allowUnreachable);
-            if (candidate == null) continue;
-            if (best == null || candidate.rank > best.rank
-                    || (candidate.rank == best.rank && candidate.area > best.area)) {
+        int bestRank = -1;
+        for (TagAim candidate : frameAims) {
+            if (candidate == null) break;
+            int rank = evaluateTagAim(candidate, current, newFrame, allowUnreachable);
+            if (rank < 0) continue;
+            if (best == null || rank > bestRank
+                    || (rank == bestRank && candidate.area > best.area)) {
                 best = candidate;
+                bestRank = rank;
             }
         }
         return best;
     }
 
-    private TagAim evaluateTagAim(LLResultTypes.FiducialResult tag, double current,
-                                  boolean newFrame, boolean allowUnreachable) {
-        int id = tag.getFiducialId();
-        HiveTarget cell = cellForTag(id);
-        if (cell == null || (odometryPoseSupplier != null && cell != target)) return null;
-        HiveAimGeometry.AimPoint point = HiveAimGeometry.fromTag(cell, id, tag.getTargetPoseCameraSpace());
-        if (point == null) {
+    private int evaluateTagAim(TagAim aim, double current,
+                               boolean newFrame, boolean allowUnreachable) {
+        int id = aim.id;
+        if (odometryPoseSupplier != null && aim.cell != target) return -1;
+        if (aim.point == null) {
             visionStatus = "Tag " + id + ": no usable 3D pose";
-            return null;
+            return -1;
         }
-        if (!point.upright) {
+        if (!aim.point.upright) {
             visionStatus = "Tag " + id + ": upside-down cell";
-            return null;
+            return -1;
         }
-        double error = point.errorDegrees();
-        if (!Double.isFinite(error) || !(Math.abs(error) <= TurretConfig.acquireDegrees)) {
+        double error = aim.errorDegrees;
+        if (!Double.isFinite(error) || !(Math.abs(error) < TurretConfig.acquireDegrees)) {
             visionStatus = "Tag " + id + ": invalid aim error / outside acquisition window";
-            return null;
+            return -1;
         }
-        double aimDegrees = current + TurretConfig.txToCcwSign * error;
-        if (!Double.isFinite(aimDegrees)) {
+        if (!Double.isFinite(current + TurretConfig.txToCcwSign * error)) {
             visionStatus = "Tag " + id + ": invalid encoder angle / configuration";
-            return null;
+            return -1;
         }
-        double candidateAim = odometryPoseSupplier != null && !newFrame && id == visionTagId
-                ? visionDegrees : aimDegrees;
-        boolean reachable = Double.isFinite(Calculations.reachableAngle(candidateAim, current,
-                TurretConfig.minDegrees, TurretConfig.maxDegrees));
+        boolean reachable = Double.isFinite(
+                visionSetpoint(current, error, newFrame || id != visionTagId));
         if (!reachable && !allowUnreachable) {
             visionStatus = "3D target outside turret limits";
-            return null;
+            return -1;
         }
         // Reachable aim first, then tracked tag, current cell, and larger image.
-        int rank = (reachable ? 3 : 0) + (id == visionTagId ? 2 : cell == target ? 1 : 0);
-        double area = Double.isFinite(tag.getTargetArea()) ? Math.max(0, tag.getTargetArea()) : 0;
-        return new TagAim(id, cell, error, rank, area);
+        return (reachable ? 3 : 0) + (id == visionTagId ? 2 : aim.cell == target ? 1 : 0);
     }
 
     private void correctOdometryAngle(double current, double age, Pose odometryPose, TagAim aim) {
@@ -560,14 +558,14 @@ public class Turret implements Mechanism {
         final int id;
         final HiveTarget cell;
         final double errorDegrees;
-        final int rank;
+        final HiveAimGeometry.AimPoint point;
         final double area;
 
-        TagAim(int id, HiveTarget cell, double errorDegrees, int rank, double area) {
+        TagAim(int id, HiveTarget cell, HiveAimGeometry.AimPoint point, double area) {
             this.id = id;
             this.cell = cell;
-            this.errorDegrees = errorDegrees;
-            this.rank = rank;
+            this.point = point;
+            this.errorDegrees = point == null ? Double.NaN : point.errorDegrees();
             this.area = area;
         }
     }
@@ -583,20 +581,29 @@ public class Turret implements Mechanism {
         if (isNewVisionFrame(timestamp, receiptTimestamp) || selectedId != visionTagId) {
             visionTimestamp = timestamp;
             visionReceiptTimestamp = receiptTimestamp;
-            visionDegrees = Calculations.reachableAngle(
-                    current + TurretConfig.txToCcwSign * selectedError, current,
-                    TurretConfig.minDegrees, TurretConfig.maxDegrees);
+            visionDegrees = visionSetpoint(current, selectedError, true);
         }
         // Repeated reads of one frame hold its setpoint; they do not add tx again.
         if (Double.isFinite(visionDegrees)) {
             visionTagId = selectedId;
             targetDegrees = visionDegrees;
             mode = "LIMELIGHT 3D POI";
-            visionStatus = "Tracking cell opening from tag " + selectedId;
+            visionStatus = Math.abs(selectedError) <= TurretConfig.visionUpdateDegrees
+                    ? "Holding 3D center target from tag " + selectedId
+                    : "Tracking cell opening from tag " + selectedId;
         } else {
             visionStatus = "Vision target outside turret limits / invalid correction";
             clearVision();
         }
+    }
+
+    private double visionSetpoint(double current, double error, boolean newMeasurement) {
+        double requested = Double.isFinite(visionDegrees) ? visionDegrees : current;
+        if (newMeasurement && Math.abs(error) > TurretConfig.visionUpdateDegrees) {
+            requested = current + TurretConfig.txToCcwSign * error;
+        }
+        return Calculations.reachableAngle(requested, current,
+                TurretConfig.minDegrees, TurretConfig.maxDegrees);
     }
 
     private boolean isNewVisionFrame(double timestamp, long receiptTimestamp) {
@@ -614,22 +621,28 @@ public class Turret implements Mechanism {
     }
 
     private boolean calibrated() {
-        double[] values = {TurretConfig.ticksPerDegree, TurretConfig.minDegrees,
-                TurretConfig.maxDegrees, TurretConfig.p, TurretConfig.visionP,
-                TurretConfig.i, TurretConfig.d,
-                TurretConfig.staticPower, TurretConfig.maxPower, TurretConfig.toleranceDegrees};
-        for (double value : values) if (!Double.isFinite(value)) return false;
-        return TurretConfig.ticksPerDegree != 0 && TurretConfig.minDegrees < 0
+        return Double.isFinite(TurretConfig.ticksPerDegree)
+                && Double.isFinite(TurretConfig.minDegrees) && Double.isFinite(TurretConfig.maxDegrees)
+                && Double.isFinite(TurretConfig.p) && Double.isFinite(TurretConfig.visionP)
+                && Double.isFinite(TurretConfig.i) && Double.isFinite(TurretConfig.d)
+                && Double.isFinite(TurretConfig.staticPower)
+                && Double.isFinite(TurretConfig.staticPowerRampDegrees)
+                && Double.isFinite(TurretConfig.maxPower) && Double.isFinite(TurretConfig.toleranceDegrees)
+                && Double.isFinite(TurretConfig.acquireDegrees)
+                && Double.isFinite(TurretConfig.visionUpdateDegrees)
+                && TurretConfig.ticksPerDegree != 0 && TurretConfig.minDegrees < 0
                 && TurretConfig.maxDegrees > 0 && TurretConfig.p >= 0 && TurretConfig.visionP >= 0
                 && TurretConfig.i >= 0 && TurretConfig.d >= 0 && TurretConfig.staticPower >= 0
+                && TurretConfig.staticPowerRampDegrees > 0
                 && TurretConfig.maxPower > 0 && TurretConfig.maxPower <= 1
-                && TurretConfig.toleranceDegrees >= 0;
+                && TurretConfig.toleranceDegrees >= 0
+                && TurretConfig.visionUpdateDegrees >= 0
+                && TurretConfig.acquireDegrees > TurretConfig.visionUpdateDegrees;
     }
 
     private void applyPower(double power) {
         if (turret == null) return;
         turret.setThrottle(Double.isFinite(power) ? power : 0);
-        turret.update();
     }
 
     public double getDegrees() {

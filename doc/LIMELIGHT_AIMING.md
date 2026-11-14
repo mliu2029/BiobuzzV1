@@ -30,20 +30,51 @@ meters to inches, are:
 These are model dimensions, not measurements of an assembled field. Source STEP
 SHA-256: `08aa041d70cdc2bfc341c6de18176bb1a250823c25020ff0043f6354f7d338fe`.
 
-The 5.622-inch offset normal to the sticker remains the SDK-defined aim point.
-The CAD does not mark a POI, and a geometric centroid of the irregular clear
-opening would be a different target. This depth is retained from the SDK rather
-than claimed as an independently measured CAD center.
+The aim point is now the **area centroid of the main opening cutout in the
+front rim plane**, measured directly from the supplied STEP using OpenCascade.
+For face #51154, the largest of its 31 inner boundary loops is the main opening;
+the other inner loops are small mounting cutouts. Filling that closed main
+boundary as a planar face gives the following coordinates in mm and area in mm²:
+
+| Measurement | CAD result |
+| --- | ---: |
+| Opening centroid X | -25.576163484914 |
+| Opening centroid Y | -33.274649041412 |
+| Opening centroid Z | -2.775667457085 |
+| Main opening area | 142174.621906750 |
+| Sticker bounding-box center X | -25.576163484914 |
+| Printed tag-row Y | 149.287850958588 |
+| Outward sticker plane Z | -149.114222187901 |
+
+The imported units were checked against the sticker's 431.8 by 127 mm
+(17 by 5 inch) bounding dimensions. The printed tag row is located from the
+production artwork, not the sticker face's area centroid: its mounting cutouts
+make those centers slightly different.
+
+Subtracting the tag-row center from the opening centroid gives
+`(0, -182.562500, +146.338554731)` mm, or
+`(0, -7.187500, +5.761360422)` inches. The code rounds depth to **5.76136 inches**.
+This replaces the SDK's 5.622-inch depth with a CAD-derived value, an increase of
+0.139360422 inches (3.539755 mm). The target is the opening's area centroid,
+rather than its bounding-box center, the rim material's centroid, or the
+centroid of the whole hive solid.
+
+![CAD opening centroid compared with the previous SDK point](hive-opening-center.svg)
+
+The CAD target is a design dimension. It does not validate camera pose accuracy,
+assembled-field tolerances, launcher alignment, or ball flight. This model
+independently covers the red audience cell; the other cells retain the same
+SDK cluster layout. The supplied odometry field coordinates are unchanged.
 
 In Limelight target coordinates (+X right, +Y down), the offsets from the red
 audience tags to the retained aim point are:
 
 | Tag | X (in) | Y (in) | Z (in) |
 | --- | ---: | ---: | ---: |
-| 34 | +6.5 | -7.1875 | +5.622 |
-| 35 | +2.75 | -7.1875 | +5.622 |
-| 36 | -2.75 | -7.1875 | +5.622 |
-| 37 | -6.5 | -7.1875 | +5.622 |
+| 34 | +6.5 | -7.1875 | +5.76136 |
+| 35 | +2.75 | -7.1875 | +5.76136 |
+| 36 | -2.75 | -7.1875 | +5.76136 |
+| 37 | -6.5 | -7.1875 | +5.76136 |
 
 Other cells use the same SDK cluster geometry with their respective IDs; the
 supplied STEP independently covers only the red audience cell. The tag rotation
@@ -62,22 +93,38 @@ Use the AprilTag pipeline selected by `TurretConfig.pipeline` (default 0):
 The robot computes a separate 3D point of interest for each ID using the
 individual tag pose. The camera's single global POI is not used for this mode;
 there is no need to cycle pipelines or set a new camera POI when tags switch.
-In `odo turret test`, `useVision` enables direct four-tag Limelight 3D aiming
-with odometry running as a fallback. A usable tag drives the turret toward the
-projected cell opening on each fresh camera frame. Its horizontal error is
+Normal TeleOp and autonomous aiming use odometry to get near the selected hive,
+then hand control to four-tag Limelight 3D when a usable opening-center error is
+less than `TurretConfig.acquireDegrees` (default 10 degrees). In `odo turret test`,
+`useVision` enables this same hybrid aiming. Its horizontal error is
 `atan2(centerRight, centerForward)` from the 3D point alone; raw tag `tx`,
 crosshair offsets, and the pipeline POI are not added to that angle. A centered
 opening therefore requests zero correction even when the visible tag is off
 to one side. The camera's forward axis must be aligned with the launcher.
 Repeated reads of the same frame hold its setpoint rather than adding the error
-again.
+again. Like DecodeV3, fresh camera frames update the encoder target only when
+the opening-center error exceeds `TurretConfig.visionUpdateDegrees` (default
+2 degrees). Inside that band, the motor controller holds the last target. If
+vision first acquires inside the band, it holds the current encoder angle.
+The target and controller remain in degrees, and the full 3D opening projection
+is retained. `toleranceDegrees` separately reports alignment. Motor power and
+encoder travel limits still apply.
+
+Friction compensation scales linearly with angular error inside
+`TurretConfig.staticPowerRampDegrees` (default 2 degrees). It is zero at zero
+error and reaches the configured `staticPower` at the ramp boundary, avoiding
+a full-power sign flip near the center. Velocity damping remains active in
+vision and odometry modes; it responds to measured turret motion rather than
+camera or odometry setpoint jumps. The ramp width is tunable in Panels and
+requires on-robot validation for friction, settling, and camera noise.
 
 Odometry selects the close or far alliance hive from the robot's Y position and
 keeps an aiming angle ready in parallel. When the selected hive has no usable
-camera target, or its camera target is outside the encoder limits, the turret
-uses that odometry angle. A usable tag immediately returns control to Limelight
-3D, including while the robot or turret is moving. Turning `useVision` off selects
-odometry only.
+camera target, its center error is outside the acquisition window, or its camera
+target is outside the encoder limits, the turret uses that odometry angle.
+An eligible tag returns control to Limelight 3D, including while the robot or
+turret is moving. Turning `useVision` off selects odometry only. The SOTM test
+retains its separate ballistic aiming.
 
 The turret starts with its encoder angle treated as 0°. After the chassis and
 turret have stayed nearly still for at least 200 ms, a fresh 3D tag can also

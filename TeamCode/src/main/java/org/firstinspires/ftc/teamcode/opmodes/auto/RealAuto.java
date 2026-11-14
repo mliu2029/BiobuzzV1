@@ -9,6 +9,7 @@ import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 import dev.nextftc.robot.opmode.NextAutonomous;
 import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.opmodes.auto.core.BaseAuto;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 
 @NextAutonomous(name = "REAL AUTO", group = "Pedro")

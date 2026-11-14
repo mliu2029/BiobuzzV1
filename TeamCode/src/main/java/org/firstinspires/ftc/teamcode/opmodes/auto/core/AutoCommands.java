@@ -1,7 +1,8 @@
-package org.firstinspires.ftc.teamcode.opmodes.auto;
+package org.firstinspires.ftc.teamcode.opmodes.auto.core;
 
 import static com.pedropathing.ivy.groups.Groups.sequential;
 
+import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.paths.Path;
@@ -29,7 +30,11 @@ public class AutoCommands {
                 Commands.instant(() -> status.accept("Starting")),
                 robot.Shooter().runFlywheel,
                 robot.Ramp().up,
-                robot.Turret().aimTurret,
+                Commands.instant(() -> {
+                    Follower follower = robot.Drivetrain().getFollower();
+                    robot.Turret().useOdometryAim(follower::pose, follower::velocity);
+                    robot.Turret().setOdometryVisionEnabled(true);
+                }).requiring(robot.Turret()),
                 robot.Intake().runIntake
         );
     }

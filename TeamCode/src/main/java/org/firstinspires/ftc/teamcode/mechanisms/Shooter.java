@@ -8,8 +8,8 @@ import dev.nextftc.units.Units;
 public class Shooter implements Mechanism {
     public static final double DEFAULT_P = 0.004;
     public static final double DEFAULT_I = 0.0;
-    public static final double DEFAULT_D = 0.0001;
-    public static final double DEFAULT_F = 0.000458;
+    public static final double DEFAULT_D = 0.000;
+    public static final double DEFAULT_F = 0.00034;
 
     private static final double DEFAULT_TARGET_VELOCITY = 1625;
 
@@ -27,7 +27,9 @@ public class Shooter implements Mechanism {
     }
 
     public void setVelocity(double velocity) {
-        targetVelocity = Math.max(0, velocity);
+        double requested = Math.max(0, velocity);
+        if (targetVelocity == requested && enabled == (requested > 0)) return;
+        targetVelocity = requested;
         enabled = targetVelocity > 0;
         if (enabled) {
             flywheel.setVelocitySetpoint(Units.RadiansPerSecond.of(targetVelocity));

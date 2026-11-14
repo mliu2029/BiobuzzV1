@@ -73,6 +73,7 @@ public class OdoTurretTest extends mainTeleOp {
     }
     @Override
     public void disabledPeriodic() {
+        if (!telemetryDue(System.nanoTime())) return;
         Pose startingPose = getStartingPose();
         telemetry.addData("Status", "Initialized");
         telemetry.addData("Alliance", getAlliance());
@@ -116,28 +117,11 @@ public class OdoTurretTest extends mainTeleOp {
         addDriverData("Pose (inches / degrees)", pose == null ? "Unavailable"
                 : String.format(Locale.US, "x=%.2f y=%.2f heading=%.1f",
                         pose.x(), pose.y(), Math.toDegrees(pose.heading())));
-        double offset = robot.Turret().getOdometryAngleOffsetDegrees();
-        double goalAngle = pose == null ? Double.NaN
-                : Calculations.bearing(pose.x(), pose.y(), pose.heading(), goal);
-        double turretTarget = Calculations.normalize(robot.Turret().getTargetDegrees() + offset);
-        addDriverData("Chassis heading / goal relative / turret target (deg)", pose == null ? "Unavailable"
-                : String.format(Locale.US, "%.1f / %+.1f / %+.1f",
-                        Math.toDegrees(pose.heading()), goalAngle, turretTarget));
-        double chassisAngle = robot.Turret().getChassisDegrees();
-        addDriverData("Turret chassis angle / encoder angle (deg)", String.format(Locale.US,
-                "%.1f / %.1f", chassisAngle, robot.Turret().getDegrees()));
-        addDriverData("Turret field heading / goal bearing (deg)", pose == null ? "Unavailable"
-                : String.format(Locale.US, "%.1f / %.1f",
-                        Calculations.normalize(Math.toDegrees(pose.heading()) + chassisAngle),
-                        Calculations.normalize(Math.toDegrees(pose.heading()) + goalAngle)));
-        addDriverData("Saved vision chassis angle / offset (deg)", String.format(Locale.US,
-                "%.1f / %+.1f%s", robot.Turret().getVisionChassisDegrees(), offset,
-                !TurretAngleEstimator.applyVisionCorrections ? " (correction OFF)"
-                        : robot.Turret().hasOdometryAimCorrection() ? "" : " (waiting for stillness/tag)"));
-        addDriverData("Vision angle correction", robot.Turret().getOdometryCorrectionStatus());
-        addDriverData("Aim source", visionModeLabel());
+        addDriverData("Turret chassis angle / saved offset (deg)", String.format(Locale.US,
+                "%.1f / %+.1f", robot.Turret().getChassisDegrees(),
+                robot.Turret().getOdometryAngleOffsetDegrees()));
+        addDriverData("Vision correction", robot.Turret().getOdometryCorrectionStatus());
         addDriverData("Shooter speed mode", autoShooterVelocity ? "AUTO DISTANCE" : "MANUAL");
-        addDriverData("3D AprilTag pipeline", TurretConfig.pipeline);
     }
 
     private static String visionModeLabel() {

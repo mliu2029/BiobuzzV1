@@ -94,13 +94,13 @@ public class Transfer implements Mechanism {
     private void stopRoller() {
         roller.getVelocityPID().reset();
         roller.setThrottle(0);
-        roller.update();
     }
 
     public void stopImmediately() {
         stopped = true;
         feeding = false;
         stopRoller();
+        roller.update();
         if (initialized) updateServo();
     }
 

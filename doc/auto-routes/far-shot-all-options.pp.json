@@ -1,0 +1,445 @@
+{
+  "version": "2.0.0",
+  "timestamp": "2026-11-14T17:13:49.392467+00:00",
+  "startPoint": {
+    "x": 58.878,
+    "y": 128.2045,
+    "locked": false,
+    "headingDeg": 270.0
+  },
+  "lines": [
+    {
+      "id": "far-shot-all-options-1",
+      "name": "FAR SHOT to GARDEN / 1",
+      "color": "#4e79a7",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 6.5879,
+        "y": 16.2961
+      },
+      "controlPoints": [
+        {
+          "x": 23.0036,
+          "y": 98.1166
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 270.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-2",
+      "name": "FAR SHOT to GARDEN / 2",
+      "color": "#4e79a7",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 6.469,
+        "y": 7.35
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 270.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-3",
+      "name": "GARDEN to FAR SHOT / 1",
+      "color": "#f28e2b",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 6.5879,
+        "y": 16.2961
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 270.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-4",
+      "name": "GARDEN to FAR SHOT / 2",
+      "color": "#f28e2b",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 58.878,
+        "y": 128.2045
+      },
+      "controlPoints": [
+        {
+          "x": 23.0036,
+          "y": 98.1166
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 270.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-5",
+      "name": "FAR SHOT to FAR FLOWER / 1",
+      "color": "#59a14f",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 46.75,
+        "y": 118.75
+      },
+      "controlPoints": [
+        {
+          "x": 51.4368,
+          "y": 113.8484
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 90.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-6",
+      "name": "FAR SHOT to FAR FLOWER / 2",
+      "color": "#59a14f",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 47.2381,
+        "y": 132.3215
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "linear",
+        "startDeg": 90.0,
+        "endDeg": 90.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-7",
+      "name": "FAR FLOWER to FAR SHOT / 1",
+      "color": "#edc948",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 46.75,
+        "y": 118.75
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "linear",
+        "startDeg": 90.0,
+        "endDeg": 90.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-8",
+      "name": "FAR FLOWER to FAR SHOT / 2",
+      "color": "#edc948",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 58.878,
+        "y": 128.2045
+      },
+      "controlPoints": [
+        {
+          "x": 51.4368,
+          "y": 113.8484
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 90.0,
+        "endDeg": 270.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-9",
+      "name": "FAR SHOT to SIDE FLOWER / 1",
+      "color": "#76b7b2",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 23.4507,
+        "y": 47.1668
+      },
+      "controlPoints": [
+        {
+          "x": 28.7152,
+          "y": 98.3556
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 180.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-10",
+      "name": "FAR SHOT to SIDE FLOWER / 2",
+      "color": "#76b7b2",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 11.495,
+        "y": 46.8662
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "linear",
+        "startDeg": 180.0,
+        "endDeg": 180.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-11",
+      "name": "SIDE FLOWER to FAR SHOT / 1",
+      "color": "#b07aa1",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 23.4507,
+        "y": 47.1668
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "linear",
+        "startDeg": 180.0,
+        "endDeg": 180.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-12",
+      "name": "SIDE FLOWER to FAR SHOT / 2",
+      "color": "#b07aa1",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 58.878,
+        "y": 128.2045
+      },
+      "controlPoints": [
+        {
+          "x": 28.7152,
+          "y": 98.3556
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 180.0,
+        "endDeg": 270.0
+      }
+    },
+    {
+      "id": "far-shot-all-options-13",
+      "name": "FAR PARK from FAR SHOT",
+      "color": "#4e79a7",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 12,
+        "y": 118.64
+      },
+      "controlPoints": [
+        {
+          "x": 40.278,
+          "y": 111.0821
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 270.0,
+        "endDeg": 0.0
+      }
+    }
+  ],
+  "shapes": [
+    {
+      "id": "triangle-1",
+      "name": "Red Goal",
+      "vertices": [
+        {
+          "x": 141.5,
+          "y": 70
+        },
+        {
+          "x": 141.5,
+          "y": 141.5
+        },
+        {
+          "x": 118.3,
+          "y": 141.5
+        },
+        {
+          "x": 135.5,
+          "y": 118
+        },
+        {
+          "x": 136.3,
+          "y": 70.2
+        }
+      ],
+      "color": "#dc2626",
+      "fillColor": "#ff6b6b"
+    },
+    {
+      "id": "triangle-2",
+      "name": "Blue Goal",
+      "vertices": [
+        {
+          "x": 6.2,
+          "y": 116.9
+        },
+        {
+          "x": 25,
+          "y": 141.5
+        },
+        {
+          "x": 0,
+          "y": 141.5
+        },
+        {
+          "x": 0,
+          "y": 70
+        },
+        {
+          "x": 6,
+          "y": 70
+        }
+      ],
+      "color": "#2563eb",
+      "fillColor": "#60a5fa"
+    }
+  ],
+  "sequence": [
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-1"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-2"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-3"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-4"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-5"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-6"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-7"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-8"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-9"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-10"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-11"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-12"
+    },
+    {
+      "kind": "path",
+      "lineId": "far-shot-all-options-13"
+    }
+  ],
+  "fieldPoints": [],
+  "robot": {
+    "forwardVelocity": 60.41705206731583,
+    "strafeVelocity": 47.33137369422454,
+    "aVelocity": 3.141592653589793,
+    "kFriction": 0.1,
+    "rLength": 14,
+    "rWidth": 12,
+    "safetyMargin": 1,
+    "maxAcceleration": 30,
+    "maxDeceleration": 30
+  },
+  "activePaths": []
+}
