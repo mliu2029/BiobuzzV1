@@ -80,6 +80,7 @@ public abstract class BioBuzzTurretTeleop extends NextOpMode {
         driver2.triangle().onTrue(Commands.instant(() -> runIntake = false));
         driver2.square().onTrue(Commands.instant(robot.Turret()::toggleManualRecenter));
 //        driver2.dpadUp().onTrue(robot.Turret().aimTurret);
+        driver2.dpadUp().onTrue(Commands.instant(robot.Turret()::toggleShootOnMove));
         driver2.circle().onTrue(Commands.instant(() ->
                 Transfer.servoFreeMode = !Transfer.servoFreeMode));
         driver2.dpadDown().onTrue(Commands.instant(() -> targetVelocity = 0));
@@ -192,6 +193,12 @@ public abstract class BioBuzzTurretTeleop extends NextOpMode {
         addDriverData("Aim", robot.Turret().getMode()
                 + (robot.Turret().isAligned() ? " | ALIGNED" : " | NOT ALIGNED"));
         addDriverData("Vision", robot.Turret().getVisionStatus());
+        addDriverData("Shoot on move (D-pad up toggles)", (robot.Turret().isShootOnMove() ? "ON: " : "")
+                + robot.Turret().getShootOnMoveStatus()
+                + (Double.isFinite(robot.Turret().getShootOnMoveLeadDegrees())
+                ? " | lead " + oneDecimal(robot.Turret().getShootOnMoveLeadDegrees()) + " deg"
+                + " | dist " + oneDecimal(robot.Turret().getShootOnMoveDistanceInches()) + " in"
+                + " | speed " + oneDecimal(robot.Turret().getRobotSpeedInPerSec()) + " in/s" : ""));
         addDriverData("Tags (seen / tracking)", robot.Turret().getVisionTags()
                 + " / " + (selectedTag < 0 ? "none" : selectedTag));
         addDriverData("Camera (pipeline / expected; age)", robot.Turret().getVisionPipeline()

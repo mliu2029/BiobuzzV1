@@ -23,6 +23,11 @@ public class Robot implements NextRobot {
     private final Transfer transfer = new Transfer();
     private final Ramp ramp =new Ramp();
 
+    public Robot() {
+        // Shoot-on-the-move reads odometry from the follower, which Drivetrain recreates on init.
+        turret.setFollowerSource(drivetrain::getFollower);
+    }
+
     private final Set<Mechanism> mechanisms = Collections.unmodifiableSet(
             new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, transfer, limelight, turret,ramp)));
 

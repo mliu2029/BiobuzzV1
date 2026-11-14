@@ -1,7 +1,10 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
+import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.behaviors.EndCondition;
+import com.pedropathing.math.Pose;
+import com.pedropathing.math.Velocity;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -12,10 +15,12 @@ import dev.nextftc.control.feedback.PIDController;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.firstinspires.ftc.teamcode.data.HiveTarget;
 import org.firstinspires.ftc.teamcode.data.Alliance;
 import org.firstinspires.ftc.teamcode.data.Calculations;
 import org.firstinspires.ftc.teamcode.data.TurretConfig;
+import org.firstinspires.ftc.teamcode.data.VirtualGoalSolver;
 
 public class Turret implements Mechanism {
     private final Limelight limelight;
@@ -45,6 +50,14 @@ public class Turret implements Mechanism {
     private int visionPipeline = -1;
     private String visionTags = "[]";
     private double visionNearestErrorDegrees = Double.NaN;
+
+    // Shooting on the move (virtual goal)
+    private Supplier<Follower> followerSource = () -> null;
+    private boolean shootOnMove;
+    private VirtualGoalSolver.Result sotm;
+    private double sotmRobotHeading = Double.NaN;
+    private String sotmStatus = "Off";
+    private double sotmSpeedInPerSec = Double.NaN;
 
     public final Command aimTurret = instant(this::resumeAutoAim);
     public final Command stopTurret = instant(this::stopImmediately);
@@ -80,6 +93,32 @@ public class Turret implements Mechanism {
             resetVisionDiagnostics("Manual recenter; auto aim off");
         }
     }
+
+    /** Where to read odometry from for shoot-on-the-move; resolved lazily each loop. */
+    public void setFollowerSource(Supplier<Follower> source) {
+        followerSource = Objects.requireNonNull(source);
+    }
+
+    public void setShootOnMove(boolean enabled) {
+        shootOnMove = enabled;
+        if (!enabled || !this.enabled) clearShootOnMove();
+    }
+
+    public void toggleShootOnMove() {
+        setShootOnMove(!shootOnMove);
+    }
+
+    public boolean isShootOnMove() { return shootOnMove; }
+    public String getShootOnMoveStatus() { return sotmStatus; }
+    /** Lead of the virtual goal over the real goal (degrees), or NaN when not active. */
+    public double getShootOnMoveLeadDegrees() {
+        return sotm == null ? Double.NaN : Math.toDegrees(sotm.leadRadians);
+    }
+    /** Distance from the turret to the virtual goal (inches), or NaN when not active. */
+    public double getShootOnMoveDistanceInches() {
+        return sotm == null ? Double.NaN : sotm.distanceInches;
+    }
+    public double getRobotSpeedInPerSec() { return sotmSpeedInPerSec; }
 
     /** Positive direction turns counterclockwise; both or neither bumper stops motion. */
     public void setManualInput(boolean leftBumper, boolean rightBumper) {
@@ -135,6 +174,7 @@ public class Turret implements Mechanism {
         turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         limelight.initialize(hardwareMap);
         target = alliance.close;
+        shootOnMove = TurretConfig.sotmDefaultOn;
         stopImmediately();
     }
 
@@ -147,8 +187,16 @@ public class Turret implements Mechanism {
         fixedDegrees = Double.NaN;
         clearVision();
         resetVisionDiagnostics("Auto aim off");
+        clearShootOnMove();
         pid.reset();
         applyPower(0);
+    }
+
+    private void clearShootOnMove() {
+        sotm = null;
+        sotmRobotHeading = Double.NaN;
+        sotmSpeedInPerSec = Double.NaN;
+        sotmStatus = shootOnMove ? "Idle (auto aim off)" : "Off";
     }
 
     private void clearVision() {
@@ -196,6 +244,7 @@ public class Turret implements Mechanism {
             return;
         }
         double current = getDegrees();
+        updateShootOnMove();
         if (Double.isFinite(fixedDegrees)) {
             // Fixed angles stay relative to the chassis, even as the robot drives.
             if (fixedDegrees >= TurretConfig.minDegrees && fixedDegrees <= TurretConfig.maxDegrees) {
@@ -203,9 +252,13 @@ public class Turret implements Mechanism {
             }
             mode = "POSITION";
             visionStatus = "Fixed angle command; auto aim inactive";
+            if (shootOnMove) sotmStatus = "Inactive (fixed angle command)";
+        } else if (sotm != null && TurretConfig.sotmOdometryAim) {
+            aimAtVirtualGoalFromOdometry(current);
         } else {
             mode = "LIMELIGHT ONLY: WAITING";
             updateVision(current);
+            if (sotm != null && Double.isFinite(targetDegrees)) addLeadToVisionTarget();
         }
         if (!Double.isFinite(targetDegrees)) {
             clearVision();
@@ -315,6 +368,92 @@ public class Turret implements Mechanism {
             visionStatus = "Vision target outside turret limits / invalid correction";
             clearVision();
         }
+    }
+
+    // ---------------- Shooting on the move ----------------
+
+    /** Solves the virtual goal for this loop from odometry; leaves sotm null when unavailable. */
+    private void updateShootOnMove() {
+        sotm = null;
+        sotmRobotHeading = Double.NaN;
+        sotmSpeedInPerSec = Double.NaN;
+        if (!shootOnMove) {
+            sotmStatus = "Off";
+            return;
+        }
+        Follower follower = followerSource.get();
+        if (follower == null) {
+            sotmStatus = "No odometry (follower not ready)";
+            return;
+        }
+        Pose pose = follower.pose();
+        Velocity velocity = follower.velocity();
+        if (pose == null || velocity == null) {
+            sotmStatus = "No odometry data";
+            return;
+        }
+        if (!sotmConfigValid()) {
+            sotmStatus = "Config invalid (see TurretConfig sotm*)";
+            return;
+        }
+        VirtualGoalSolver.Result result = VirtualGoalSolver.solve(
+                pose.x(), pose.y(), pose.heading(),
+                velocity.vx, velocity.vy, velocity.omega,
+                target.x, target.y,
+                TurretConfig.sotmTurretOffsetXInches, TurretConfig.sotmTurretOffsetYInches,
+                TurretConfig.sotmBallTransferTimeSec, TurretConfig::timeOfFlightSeconds,
+                TurretConfig.sotmIterations, Math.toRadians(TurretConfig.sotmMaxLeadDegrees));
+        if (result == null) {
+            sotmStatus = "No solution (invalid odometry or turret on goal)";
+            return;
+        }
+        sotm = result;
+        sotmRobotHeading = pose.heading();
+        sotmSpeedInPerSec = Math.hypot(velocity.vx, velocity.vy);
+        sotmStatus = result.fallback ? "Fallback: no flight time, no lead"
+                : result.leadClamped ? "Active (lead capped)" : "Active";
+    }
+
+    private boolean sotmConfigValid() {
+        double[] values = {TurretConfig.sotmTurretOffsetXInches, TurretConfig.sotmTurretOffsetYInches,
+                TurretConfig.sotmBallTransferTimeSec, TurretConfig.sotmMaxLeadDegrees,
+                TurretConfig.sotmVelocityLeadSec};
+        for (double value : values) if (!Double.isFinite(value)) return false;
+        return TurretConfig.sotmBallTransferTimeSec >= 0 && TurretConfig.sotmMaxLeadDegrees >= 0
+                && TurretConfig.sotmIterations >= 1
+                && Double.isFinite(TurretConfig.timeOfFlightSeconds(0));
+    }
+
+    /** Aim-rate feedforward as extra target degrees (0 when disabled). */
+    private double velocityLeadDegrees() {
+        return Math.toDegrees(sotm.relativeAngularVelocity * TurretConfig.sotmVelocityLeadSec);
+    }
+
+    /** Pure-odometry aiming at the virtual goal, as Seattle Solvers does. */
+    private void aimAtVirtualGoalFromOdometry(double current) {
+        mode = "SHOOT ON MOVE: ODOMETRY";
+        double relative = Calculations.normalize(
+                Math.toDegrees(sotm.headingRadians - sotmRobotHeading));
+        double reachable = Calculations.reachableAngle(relative + velocityLeadDegrees(), current,
+                TurretConfig.minDegrees, TurretConfig.maxDegrees);
+        if (Double.isFinite(reachable)) {
+            targetDegrees = reachable;
+            visionStatus = "Odometry aim at " + target + " virtual goal (Limelight not used)";
+        } else {
+            visionStatus = "Virtual goal outside turret limits";
+        }
+    }
+
+    /**
+     * Adds the odometry lead on top of the Limelight bearing. The Limelight target is rebuilt from
+     * a fresh camera frame each time, so the lead is applied once and never accumulates.
+     */
+    private void addLeadToVisionTarget() {
+        double leaded = targetDegrees + Math.toDegrees(sotm.leadRadians) + velocityLeadDegrees();
+        targetDegrees = Math.max(TurretConfig.minDegrees, Math.min(TurretConfig.maxDegrees, leaded));
+        mode = "LIMELIGHT + SHOOT ON MOVE";
+        visionStatus = visionStatus + String.format(java.util.Locale.US,
+                " | lead %.1f deg", Math.toDegrees(sotm.leadRadians));
     }
 
     private void selectVisibleHive(LLResult result, double age, double acquireDegrees) {
