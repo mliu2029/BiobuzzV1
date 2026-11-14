@@ -9,10 +9,10 @@ import com.qualcomm.robotcore.hardware.VoltageSensor;
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
-import org.firstinspires.ftc.teamcode.data.OpModeStorage;
+import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.data.Alliance;
-import org.firstinspires.ftc.teamcode.data.TurretConfig;
+import org.firstinspires.ftc.teamcode.util.Alliance;
+import org.firstinspires.ftc.teamcode.util.TurretConfig;
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter;
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer;
 import java.util.Locale;
@@ -79,7 +79,7 @@ public abstract class BioBuzzTurretTeleop extends NextOpMode {
         CommandGamepad driver2 = new CommandGamepad(gamepad2);
         driver2.triangle().onTrue(Commands.instant(() -> runIntake = false));
         driver2.square().onTrue(Commands.instant(robot.Turret()::toggleManualRecenter));
-//        driver2.dpadUp().onTrue(robot.Turret().aimTurret);
+        driver2.dpadUp().onTrue(Commands.instant(robot.Turret()::toggleShootOnMove));
         driver2.circle().onTrue(Commands.instant(() ->
                 Transfer.servoFreeMode = !Transfer.servoFreeMode));
         driver2.dpadDown().onTrue(Commands.instant(() -> targetVelocity = 0));
@@ -192,6 +192,8 @@ public abstract class BioBuzzTurretTeleop extends NextOpMode {
         addDriverData("Aim", robot.Turret().getMode()
                 + (robot.Turret().isAligned() ? " | ALIGNED" : " | NOT ALIGNED"));
         addDriverData("Vision", robot.Turret().getVisionStatus());
+        addDriverData("Shoot on move (D-pad up toggles)", (robot.Turret().isShootOnMove() ? "ON: " : "")
+                + robot.Turret().getShootOnMoveStatus());
         addDriverData("Tags (seen / tracking)", robot.Turret().getVisionTags()
                 + " / " + (selectedTag < 0 ? "none" : selectedTag));
         addDriverData("Camera (pipeline / expected; age)", robot.Turret().getVisionPipeline()

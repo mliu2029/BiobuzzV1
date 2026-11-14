@@ -1,9 +1,7 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
+import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
-import com.pedropathing.ivy.behaviors.EndCondition;
-import com.pedropathing.math.Pose;
-import com.pedropathing.math.Velocity;
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
 import com.qualcomm.hardware.limelightvision.LLResult;
@@ -17,12 +15,6 @@ import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import dev.nextftc.units.Units;
 import java.util.Objects;
-import java.util.function.Supplier;
-import org.firstinspires.ftc.teamcode.data.HiveTarget;
-import org.firstinspires.ftc.teamcode.data.Alliance;
-import org.firstinspires.ftc.teamcode.data.Calculations;
-import org.firstinspires.ftc.teamcode.data.TurretConfig;
-import org.firstinspires.ftc.teamcode.data.VirtualGoalSolver;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import org.firstinspires.ftc.teamcode.util.HiveTarget;
@@ -30,6 +22,7 @@ import org.firstinspires.ftc.teamcode.util.Alliance;
 import org.firstinspires.ftc.teamcode.util.Calculations;
 import org.firstinspires.ftc.teamcode.util.HiveAimGeometry;
 import org.firstinspires.ftc.teamcode.util.TurretConfig;
+import org.firstinspires.ftc.teamcode.util.VirtualGoalSolver;
 import org.firstinspires.ftc.teamcode.util.TurretAngleEstimator;
 
 public class Turret implements Mechanism {
@@ -213,6 +206,7 @@ public class Turret implements Mechanism {
 
     public void initialize(HardwareMap hardwareMap, Alliance alliance, double startingDegrees) {
         this.alliance = Objects.requireNonNull(alliance, "Alliance is required");
+        shootOnMove = TurretConfig.sotmDefaultOn;
         odometryPoseSupplier = null;
         odometryVelocitySupplier = null;
         resetOdometryAimCorrection();
@@ -225,10 +219,14 @@ public class Turret implements Mechanism {
         turretMotor.setPower(0);
         turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        if (turret == null) turret = new NextMotor(() -> turretMotor);
+        if (turret == null) {
+            turret = new NextMotor(() -> turretMotor, Units.Radians.of(1.0), POWER_CACHE_TOLERANCE);
+        }
         turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         limelight.initialize(hardwareMap);
         target = alliance.close;
+        lastRecenterDegrees = Double.NaN;
+        recenterCount = 0;
         stopImmediately();
     }
 
@@ -240,8 +238,8 @@ public class Turret implements Mechanism {
         motionStatus = "Auto aim off";
         targetDegrees = Double.NaN;
         clearVision();
-        resetVisionDiagnostics("Auto aim off");
         clearShootOnMove();
+        resetVisionDiagnostics("Auto aim off");
         pid.reset();
         applyPower(0);
     }
@@ -316,21 +314,23 @@ public class Turret implements Mechanism {
             return;
         }
         double current = getDegrees();
-        updateShootOnMove();
-        if (Double.isFinite(fixedDegrees)) {
-            // Fixed angles stay relative to the chassis, even as the robot drives.
-            if (fixedDegrees >= TurretConfig.minDegrees && fixedDegrees <= TurretConfig.maxDegrees) {
-                targetDegrees = fixedDegrees;
-            }
-            mode = "POSITION";
-            visionStatus = "Fixed angle command; auto aim inactive";
-            if (shootOnMove) sotmStatus = "Inactive (fixed angle command)";
+        // Our shoot-on-the-move solve is skipped while an external moving aim owns the turret.
+        if (movingAimDegrees != null) clearShootOnMove(); else updateShootOnMove();
+        if (movingAimDegrees != null) {
+            clearVision();
+            mode = "SHOOTING ON THE MOVE";
+            targetDegrees = Calculations.reachableAngle(movingAimDegrees.getAsDouble(), current,
+                    TurretConfig.minDegrees, TurretConfig.maxDegrees);
+            visionStatus = Double.isFinite(targetDegrees) ? "Ballistic odometry aim"
+                    : "No ballistic solution / target outside turret limits";
         } else if (sotm != null && TurretConfig.sotmOdometryAim) {
             aimAtVirtualGoalFromOdometry(current);
+        } else if (odometryPoseSupplier != null) {
+            updateOdometryAim(current);
+            if (sotm != null && Double.isFinite(targetDegrees)) addLeadToVisionTarget();
         } else {
             mode = "LIMELIGHT ONLY: WAITING";
             updateVision(current, null);
-            updateVision(current);
             if (sotm != null && Double.isFinite(targetDegrees)) addLeadToVisionTarget();
         }
         if (!Double.isFinite(targetDegrees)) {
@@ -736,29 +736,6 @@ public class Turret implements Mechanism {
                 " | lead %.1f deg", Math.toDegrees(sotm.leadRadians));
     }
 
-    private void selectVisibleHive(LLResult result, double age, double acquireDegrees) {
-        boolean closeUsable = false;
-        boolean farUsable = false;
-        for (LLResultTypes.FiducialResult tag : result.getFiducialResults()) {
-            int id = tag.getFiducialId();
-            HiveTarget observed = alliance.close.acceptsTag(id) ? alliance.close
-                    : alliance.far.acceptsTag(id) ? alliance.far : null;
-            if (observed == null) continue;
-            double error = tag.getTargetXDegrees() - TurretConfig.desiredTx(observed, id);
-            if (!Calculations.usableVision(observed, id, result.getPipelineIndex(),
-                    TurretConfig.pipeline, age, TurretConfig.maxFrameAgeMs,
-                    error, acquireDegrees)) continue;
-            if (observed == alliance.close) closeUsable = true;
-            else farUsable = true;
-        }
-        // Retain the current hive while usable, just as we retain one tag within that hive.
-        if ((target == alliance.close && closeUsable) || (target == alliance.far && farUsable)) return;
-        HiveTarget selected = closeUsable ? alliance.close : farUsable ? alliance.far : null;
-        if (selected != null && selected != target) {
-            target = selected;
-            clearVision();
-            pid.reset();
-        }
     private boolean isNewVisionFrame(double timestamp, long receiptTimestamp) {
         // The SDK returns zero when the native timestamp is absent.
         return Double.isFinite(timestamp) && timestamp > 0
