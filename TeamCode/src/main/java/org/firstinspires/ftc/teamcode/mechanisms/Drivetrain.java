@@ -5,7 +5,6 @@ import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.behaviors.EndCondition;
 import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.ivy.pedro.PedroCommands;
-import com.pedropathing.math.Pose;
 import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -15,7 +14,6 @@ import org.firstinspires.ftc.teamcode.pedro.Constants;
 public class Drivetrain implements Mechanism {
     private static final double PATH_TIMEOUT_MS = 5000;
 
-    public Drivetrain() { }
     private Follower follower;
 
     public void initialize(HardwareMap hardwareMap) {
@@ -35,15 +33,11 @@ public class Drivetrain implements Mechanism {
         })
                 .setEnd(condition -> stopImmediately());
     }
-    public Command relocalize() {
-        return Commands.instant(() -> follower.setPose(new Pose(8, 8, 0)));
-    }
 
     public Command followPath(Path path) {
         return PedroCommands.follow(follower, path)
                 .setDone(() -> follower.atParametricEnd() && !follower.isBusy())
                 .setEnd(condition -> {
-                    // A timeout interrupts this command; stop the old path before moving on.
                     if (condition != EndCondition.NATURALLY) {
                         stopImmediately();
                     }

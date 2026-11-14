@@ -1,11 +1,12 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
-import dev.nextftc.hardware.actuators.MotorVelocityConstants;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import dev.nextftc.units.Units;
 
+@Configurable
 public class Intake implements Mechanism {
     public static final double DEFAULT_P = 0.000001;
     public static final double DEFAULT_I = 0.0;
@@ -13,75 +14,71 @@ public class Intake implements Mechanism {
     public static final double DEFAULT_F = 0.000323;
     public static final double DEFAULT_TARGET_VELOCITY = 2500;
 
-    private final NextMotor intake;
-    private boolean enabled;
-    private boolean velocityGainsValid = true;
+    public static volatile double stallVelocity = 250;
+    public static volatile double stallSeconds = 3.0;
+
+    private final NextMotor intake = new NextMotor("intake");
     private double targetVelocity;
+    private boolean stalled;
+    private long slowSinceNanos;
 
-    public final Command runIntake = instant(() -> setVelocity(DEFAULT_TARGET_VELOCITY));
-    public final Command runIntakeReverse = instant(() -> setVelocity(-DEFAULT_TARGET_VELOCITY));
-    public final Command stopIntake = instant(this::stopImmediately);
+    public final Command runIntake = instant(this::restart);
 
-    public Intake() {
-        this(new NextMotor("intake"));
-    }
-
-    Intake(NextMotor intake) {
-        this.intake = intake;
+    public void restart() {
+        stalled = false;
+        slowSinceNanos = 0;
+        setVelocity(DEFAULT_TARGET_VELOCITY);
     }
 
     public void initialize() {
-// THE MOTOR IS REVERSE DONT CHANGE IT
         intake.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         intake.setDirection(NextMotor.Direction.REVERSE);
         stopImmediately();
-        velocityGainsValid = false;
         setPIDFCoefficients(DEFAULT_P, DEFAULT_I, DEFAULT_D, DEFAULT_F);
     }
 
     public void setVelocity(double velocity) {
-        double target = Double.isFinite(velocity) ? velocity : 0;
-        boolean targetChanged = targetVelocity != target;
-        targetVelocity = target;
-        if (target == 0 || !velocityGainsValid) {
-            stopImmediately();
+        if (velocity <= 0) {
+            stalled = false;
+            slowSinceNanos = 0;
+        }
+        if (stalled) return;
+        targetVelocity = velocity;
+        if (velocity == 0) stopImmediately();
+        else intake.setVelocitySetpoint(Units.RadiansPerSecond.of(velocity));
+    }
+
+    @Override
+    public void periodic() {
+        if (targetVelocity <= 0 || Math.abs(getVelocity()) >= stallVelocity) {
+            slowSinceNanos = 0;
             return;
         }
-        if (!enabled || targetChanged) intake.getVelocityPID().reset();
-        enabled = true;
-        intake.setVelocitySetpoint(Units.RadiansPerSecond.of(target));
+        long now = System.nanoTime();
+        if (slowSinceNanos == 0) slowSinceNanos = now;
+        if ((now - slowSinceNanos) / 1e9 >= stallSeconds) {
+            stopImmediately();
+            stalled = true;
+        }
     }
 
     public void setPIDFCoefficients(double p, double i, double d, double f) {
-        if (!Double.isFinite(p) || !Double.isFinite(i)
-                || !Double.isFinite(d) || !Double.isFinite(f)) {
-            velocityGainsValid = false;
-            stopImmediately();
-            return;
-        }
-        MotorVelocityConstants gains = intake.getVelocityConstants();
-        if (velocityGainsValid && gains.getKP() == p && gains.getKI() == i
-                && gains.getKD() == d && gains.getKV() == f) {
-            return;
-        }
-        gains.setKP(p);
-        gains.setKI(i);
-        gains.setKD(d);
-        gains.setKV(f);
-        intake.getVelocityPID().reset();
-        velocityGainsValid = true;
+        intake.getVelocityConstants().withP(p).withI(i).withD(d).withV(f);
     }
 
     public double getTargetVelocity() { return targetVelocity; }
     public double getVelocity() { return -intake.getEncoderVelocity().into(Units.RadiansPerSecond); }
-    public double getPower() { return Math.max(-1, Math.min(1, intake.getThrottle())); }
-    public boolean isEnabled() { return enabled; }
+    public double getPower() { return intake.getThrottle(); }
+    public String getStatus() {
+        return stalled ? "Stalled" : targetVelocity > 0 ? "Intaking" : targetVelocity < 0 ? "Reverse" : "Off";
+    }
 
     public void stopImmediately() {
-        enabled = false;
         targetVelocity = 0;
+        stalled = false;
+        slowSinceNanos = 0;
         intake.getVelocityPID().reset();
-        intake.setThrottle(0.0);
+        intake.setThrottle(0);
         intake.update();
     }
 }
