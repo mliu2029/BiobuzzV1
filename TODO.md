@@ -11,10 +11,9 @@ Transfer remains disabled, and the autonomous OpMode annotations are commented o
 
 ## P0 — Finish the active mechanisms
 
-- [ ] **Add an intake stop control.** `opmodes/teleop/TeleOp.java` binds forward and
-  reverse, but never binds the existing `Intake.stopIntake` command. Choose a
-  button or hold-to-run behavior and document it. Verify the driver can stop the
-  intake during PLAY without ending the OpMode.
+- [ ] **Verify the main TeleOps' intake stop control on the robot.** Red and blue
+  turret TeleOps share `opmodes/teleop/BioBuzzTurretTeleop.java`. Gamepad 1 Cross/X
+  stops intake; verify it works during PLAY without ending the OpMode.
 - [ ] **Confirm intake direction and power on the robot.** Resolve the direction
   TODO in `mechanisms/Intake.java`. Check that the TeleOp's +1 intake command and
   the tuner's -0.7 command move game pieces in the intended directions.

@@ -1,7 +1,9 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.Scheduler;
 import com.pedropathing.ivy.commands.Commands;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import dev.nextftc.robot.Mechanism;
@@ -17,12 +19,17 @@ public class Robot implements NextRobot {
     private final Intake intake = new Intake();
     private final Shooter shooter = new Shooter();
     private final Limelight limelight = new Limelight();
-    private final Turret turret = new Turret(drivetrain, limelight);
+    private final Turret turret = new Turret(limelight);
     private final Transfer transfer = new Transfer();
-    private final Ramp ramp =new Ramp();
+    private final Ramp ramp = new Ramp();
+
+    public Robot() {
+        // Shoot-on-the-move reads odometry from the follower, which Drivetrain recreates on init.
+        turret.setFollowerSource(drivetrain::getFollower);
+    }
 
     private final Set<Mechanism> mechanisms = Collections.unmodifiableSet(
-            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, transfer, limelight, turret,ramp)));
+            new LinkedHashSet<>(Arrays.asList(drivetrain, intake, shooter, transfer, limelight, turret, ramp)));
 
     public Drivetrain Drivetrain() { return drivetrain; }
     public Intake Intake() { return intake; }
@@ -35,6 +42,18 @@ public class Robot implements NextRobot {
     @Override
     public Set<Mechanism> getMechanisms() {
         return mechanisms;
+    }
+
+    public void prepareForInit(HardwareMap hardwareMap) {
+        Scheduler.reset();
+        turret.stopImmediately();
+        drivetrain.stopImmediately();
+        shooter.stopImmediately();
+        intake.stopImmediately();
+        transfer.prepareForInit();
+        for (DcMotor motor : hardwareMap.getAll(DcMotor.class)) {
+            motor.setPower(0);
+        }
     }
 
     public void initialize(HardwareMap hardwareMap) {
