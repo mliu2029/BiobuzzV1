@@ -30,7 +30,7 @@ public final class TurretAngleEstimator {
     public void tagLost() {
         correctedWhileVisible = false;
         resetStillness();
-        status = corrected ? "Tag lost; holding correction, re-armed" : "Waiting for a usable 3D tag";
+        status = corrected ? "Tag lost; holding correction, re-armed" : "Waiting for a usable tag";
     }
 
     public void updateStillness(long nowNanos, double speedInchesPerSecond,
@@ -48,7 +48,7 @@ public final class TurretAngleEstimator {
             return;
         }
         if (stillSinceNanos == 0) stillSinceNanos = nowNanos;
-        status = "Waiting for stillness and one usable 3D tag";
+        status = "Waiting for stillness and one usable tag";
     }
 
     /** goalDegrees and cameraErrorCcwDegrees are both relative to the chassis, CCW positive. */

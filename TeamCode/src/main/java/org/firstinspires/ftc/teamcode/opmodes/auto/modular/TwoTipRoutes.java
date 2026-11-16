@@ -9,9 +9,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
+import org.firstinspires.ftc.teamcode.util.Alliance;
+import org.firstinspires.ftc.teamcode.util.Calculations;
 
 /** Explicit routes: pickup and shooting poses are destinations, never transit hubs. */
 public final class TwoTipRoutes {
+    public static final double FIELD_SIZE_INCHES = 141.5;
     private static final PoseFactory POSES = PoseFactory.degrees();
     public enum Stop {
         CLOSE_SHOT(53.0036, 6.0788, 90),
@@ -39,13 +42,29 @@ public final class TwoTipRoutes {
             this.controls = Collections.unmodifiableList(Arrays.asList(controls.clone()));
         }
         public Path path(Pose actualStart) {
-            if (controls.isEmpty()) return Paths.line(actualStart, to.pose).linear(actualStart, to.pose);
+            return path(actualStart, Alliance.RED);
+        }
+
+        public Path path(Pose actualStart, Alliance alliance) {
+            Pose target = targetPose(alliance);
+            if (controls.isEmpty()) return Paths.line(actualStart, target).linear(actualStart, target);
             Pose[] points = new Pose[controls.size() + 2];
             points[0] = actualStart;
-            for (int i = 0; i < controls.size(); i++) points[i + 1] = controls.get(i);
-            points[points.length - 1] = to.pose;
-            return Paths.curve(points).linear(actualStart, to.pose);
+            for (int i = 0; i < controls.size(); i++) {
+                points[i + 1] = transformPose(controls.get(i), alliance);
+            }
+            points[points.length - 1] = target;
+            return Paths.curve(points).linear(actualStart, target);
         }
+
+        public Pose targetPose(Alliance alliance) {
+            return transformPose(to.pose, alliance);
+        }
+
+        public Pose startPose(Alliance alliance) {
+            return transformPose(from.pose, alliance);
+        }
+
         public List<Pose> controlPoints() { return controls; }
         private Leg reversed() {
             Pose[] reversed = new Pose[controls.size()];
@@ -161,6 +180,30 @@ public final class TwoTipRoutes {
 
     public static Stop park(TwoTipPlan.Hive side) {
         return side == TwoTipPlan.Hive.CLOSE ? Stop.CLOSE_PARK : Stop.FAR_PARK;
+    }
+
+    public static Pose transformPose(Pose pose, Alliance alliance) {
+        if (alliance == Alliance.RED || pose == null) return pose;
+        double x = FIELD_SIZE_INCHES - pose.x();
+        double y = FIELD_SIZE_INCHES - pose.y();
+        double headingDegrees = Calculations.normalize(Math.toDegrees(pose.heading()) + 180.0);
+        return POSES.of(x, y, headingDegrees);
+    }
+
+    public static Pose startPose(TwoTipPlan.Hive side, Alliance alliance) {
+        return transformPose(start(side).pose, alliance);
+    }
+
+    public static Pose shootingPose(TwoTipPlan.Hive hive, Alliance alliance) {
+        return transformPose(shooting(hive).pose, alliance);
+    }
+
+    public static Pose parkPose(TwoTipPlan.Hive side, Alliance alliance) {
+        return transformPose(park(side).pose, alliance);
+    }
+
+    public static Pose pickupPose(TwoTipPlan.Pickup pickup, Alliance alliance) {
+        return transformPose(pickup(pickup).pose, alliance);
     }
 
     public static double distance(Pose a, Pose b) { return Math.hypot(a.x()-b.x(), a.y()-b.y()); }

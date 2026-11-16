@@ -14,20 +14,31 @@ public class Ramp implements Mechanism {
     public static volatile double ramp2DownPosition = 0.05;
     private final NextServo ramp1 = new NextServo("ramp1");
     private final NextServo ramp2 = new NextServo("ramp2");
-    private Boolean raised;
+    private boolean raised = false;
 
     public final Command up = instant(() -> setRaised(true));
     public final Command down = instant(() -> setRaised(false));
-    // With no prior ramp command, the first press raises it.
-    public final Command toggle = instant(() -> setRaised(!Boolean.TRUE.equals(raised)));
+    public final Command toggle = instant(() -> setRaised(!raised));
 
-    private void setRaised(boolean raised) {
+    public void setRaised(boolean raised) {
         ramp1.setPosition(raised ? ramp1UpPosition : ramp1DownPosition);
         ramp2.setPosition(raised ? ramp2UpPosition : ramp2DownPosition);
         this.raised = raised;
     }
 
+    public boolean isRaised() {
+        return raised;
+    }
+
     public String getStatus() {
-        return raised == null ? "Not commanded" : raised ? "Up" : "Down";
+        return raised ? "Up" : "Down";
+    }
+
+    public void initialize() {
+        raised = false;
+    }
+
+    public void stopImmediately() {
+        // Clear state on stop
     }
 }

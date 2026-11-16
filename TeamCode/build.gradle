@@ -52,6 +52,7 @@ repositories {
 
 dependencies {
     implementation project(':FtcRobotController')
+    implementation 'dev.frozenmilk.sinister:Sloth:0.3.2'
     implementation 'com.pedropathing:revhub:3.0.2'
     implementation 'com.skeletonarmyftc.marrow:core:1.2.5'
     implementation 'com.pedropathing:tuning:1.0.3'

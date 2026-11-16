@@ -1,32 +1,80 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
+import com.pedropathing.ivy.Command;
 import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import dev.nextftc.hardware.webcams.NextLimelight;
 import dev.nextftc.robot.Mechanism;
 
 public class Limelight implements Mechanism {
-    private Limelight3A limelight;
+    private final NextLimelight limelight;
     private int pipeline = -1;
 
+    public final Command startLimelight;
+    public final Command stopLimelight;
+
+    public Limelight() {
+        this("limelight");
+    }
+
+    public Limelight(String name) {
+        this.limelight = new NextLimelight(name);
+        this.startLimelight = instant(() -> {
+            try { limelight.start(); } catch (Exception ignored) {}
+        });
+        this.stopLimelight = instant(() -> {
+            try { limelight.stop(); } catch (Exception ignored) {}
+        });
+    }
+
+    public Command on() {
+        return startLimelight;
+    }
+
+    public Command off() {
+        return stopLimelight;
+    }
+
+    public Command setPipelineCommand(int index) {
+        return instant(() -> setPipeline(index));
+    }
+
     public void initialize(HardwareMap hardwareMap) {
-        limelight = hardwareMap.tryGet(Limelight3A.class, "limelight");
         pipeline = -1;
-        if (limelight == null) return;
-        limelight.setPollRateHz(50);
-        limelight.start();
+        try {
+            limelight.setPollRate(50);
+            limelight.start();
+        } catch (Exception ignored) {
+        }
     }
 
     public void setPipeline(int index) {
-        if (limelight == null || index == pipeline) return;
-        if (limelight.pipelineSwitch(index)) pipeline = index;
+        if (index == pipeline) return;
+        try {
+            if (limelight.setPipeline(index)) {
+                pipeline = index;
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     public LLResult getLatestResult() {
-        return limelight == null ? null : limelight.getLatestResult();
+        try {
+            return limelight.getLatestResult();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public boolean isAvailable() {
-        return limelight != null;
+        try {
+            return limelight.isConnected();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public NextLimelight getNextLimelight() {
+        return limelight;
     }
 }

@@ -2,6 +2,9 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
+
+import dev.nextftc.hardware.RobotController;
+import dev.nextftc.hardware.actuators.MotorVelocityConstants;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.hardware.actuators.NextServo;
 import dev.nextftc.robot.Mechanism;
@@ -9,39 +12,56 @@ import dev.nextftc.units.Units;
 
 @Configurable
 public class Transfer implements Mechanism {
+    public static final double ticksPerRevolution = 28.0;
+
     public static volatile double openPosition = 0.13;
     public static volatile double blockedPosition = 0.7;
-    public static volatile boolean servoFreeMode = false;
-    public static volatile double closedReverseVelocity = 1000;
+    public static volatile double closedReverseRPM = 2140;
 
-    public static final double DEFAULT_ROLLER_P = 0.0001;
-    public static final double DEFAULT_ROLLER_I = 0.0;
-    public static final double DEFAULT_ROLLER_D = 0.0;
-    public static final double DEFAULT_ROLLER_F = 0.0004279;
-    public static final double DEFAULT_ROLLER_TARGET_VELOCITY = 1200;
+    // NextFTC Velocity PID & Feedforward Constants
+    public static volatile double kP = 0.00004667;
+    public static volatile double kI = 0.0;
+    public static volatile double kD = 0.0;
+    public static volatile double kV = 0.0001997;
+    public static volatile double rollerDefaultRPM = 2570;
 
-    private final NextServo transfer = new NextServo("transfer");
-    private final NextMotor roller = new NextMotor("rollers");
+    private final NextServo transfer = new NextServo(RobotController.expansionHub(),2);
+    private final NextMotor roller = new NextMotor("rollers", Units.Rotations.of(1.0 / ticksPerRevolution));
+    private boolean servoFreeMode = false;
     private boolean feeding;
     private boolean stopped = true;
     private boolean initialized;
     private boolean servoDisabled;
-    private double rollerTargetVelocity = DEFAULT_ROLLER_TARGET_VELOCITY;
+    private double rollerTarget = rollerDefaultRPM;
 
     public final Command feed = instant(() -> setFeeding(true));
     public final Command stopFeeding = instant(() -> setFeeding(false));
+    public final Command toggleServoFree = instant(this::toggleServoFreeMode);
+
+    // Aliases
+    public final Command run = feed;
+    public final Command stop = stopFeeding;
 
     public void initialize() {
         initialized = false;
-        if (!servoFreeMode) transfer.setDirection(NextMotor.Direction.FORWARD);
+        servoFreeMode = false;
+        transfer.setDirection(NextMotor.Direction.FORWARD);
         roller.setDirection(NextMotor.Direction.FORWARD);
-        rollerTargetVelocity = DEFAULT_ROLLER_TARGET_VELOCITY;
+        rollerTarget = rollerDefaultRPM;
         stopImmediately();
-        setRollerPIDFCoefficients(DEFAULT_ROLLER_P, DEFAULT_ROLLER_I,
-                DEFAULT_ROLLER_D, DEFAULT_ROLLER_F);
+        applyRollerVelocityConstants();
         initialized = true;
         setFeeding(false);
         periodic();
+    }
+
+    /** Apply NextFTC velocity constants to the roller motor */
+    public void applyRollerVelocityConstants() {
+        roller.getVelocityConstants()
+                .withP(kP)
+                .withI(kI)
+                .withD(kD)
+                .withV(kV);
     }
 
     public void setFeeding(boolean feeding) {
@@ -49,17 +69,36 @@ public class Transfer implements Mechanism {
         stopped = false;
     }
 
-    public void setRollerVelocity(double velocity) {
-        rollerTargetVelocity = Math.max(0, velocity);
+    public boolean isFeeding() {
+        return feeding && !stopped;
+    }
+
+    /** Set roller speed in RPM. */
+    public void setRollerVelocity(double rpm) {
+        rollerTarget = Math.max(0, rpm);
+    }
+
+    public void setServoFreeMode(boolean freeMode) {
+        this.servoFreeMode = freeMode;
+    }
+
+    public boolean isServoFreeMode() {
+        return servoFreeMode;
+    }
+
+    public void toggleServoFreeMode() {
+        setServoFreeMode(!servoFreeMode);
     }
 
     @Override
     public void periodic() {
         if (!initialized) return;
         updateServo();
-        double velocity = getCommandedRollerVelocity();
-        if (velocity == 0) stopRoller();
-        else roller.setVelocitySetpoint(Units.RadiansPerSecond.of(velocity));
+        double speed = getTargetVelocity();
+        if (speed == 0) stopRoller();
+        else {
+            roller.setVelocitySetpoint(Units.RotationsPerMinute.of(speed));
+        }
     }
 
     private void updateServo() {
@@ -71,24 +110,43 @@ public class Transfer implements Mechanism {
         if (!servoFreeMode) transfer.setPosition(feeding && !stopped ? openPosition : blockedPosition);
     }
 
-    public void setRollerPIDFCoefficients(double p, double i, double d, double f) {
-        roller.getVelocityConstants().withP(p).withI(i).withD(d).withV(f);
+    public void setRollerVelocityConstants(double kP, double kI, double kD, double kV) {
+        roller.getVelocityConstants()
+                .withP(kP)
+                .withI(kI)
+                .withD(kD)
+                .withV(kV);
     }
 
-    public double getCommandedRollerVelocity() {
+    public MotorVelocityConstants getRollerVelocityConstants() {
+        return roller.getVelocityConstants();
+    }
+
+    public NextMotor getRoller() {
+        return roller;
+    }
+
+    /** Returns commanded velocity in RPM. */
+    public double getTargetVelocity() {
         if (stopped) return 0;
-        if (feeding) return rollerTargetVelocity;
-        return servoFreeMode ? -Math.abs(closedReverseVelocity) : 0;
+        if (feeding) return rollerTarget;
+        return servoFreeMode ? -Math.abs(closedReverseRPM) : 0;
     }
 
     public double getPosition() { return servoFreeMode ? Double.NaN : transfer.getPosition(); }
-    public double getRollerVelocity() { return roller.getEncoderVelocity().into(Units.RadiansPerSecond); }
+
+    /** Returns measured roller velocity in RPM. */
+    public double getRollerVelocity() {
+        return roller.getEncoderVelocity().into(Units.RotationsPerMinute);
+    }
+
     public double getRollerPower() { return roller.getThrottle(); }
+
     public String getStatus() {
         if (stopped) return "Stopped";
-        if (feeding) return rollerTargetVelocity <= 0 ? "Open"
+        if (feeding) return rollerTarget <= 0 ? "Open"
                 : servoFreeMode ? "Feeding (servo off)" : "Feeding";
-        return getCommandedRollerVelocity() < 0 ? "Reverse hold (servo off)" : "Closed";
+        return getTargetVelocity() < 0 ? "Reverse hold (servo off)" : "Closed";
     }
 
     private void stopRoller() {
@@ -100,12 +158,15 @@ public class Transfer implements Mechanism {
         stopped = true;
         feeding = false;
         stopRoller();
-        roller.update();
-        if (initialized) updateServo();
+        if (initialized) {
+            roller.update();
+            updateServo();
+        }
     }
 
     public void prepareForInit() {
         initialized = false;
+        servoFreeMode = false;
         stopImmediately();
     }
 }

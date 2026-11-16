@@ -29,7 +29,8 @@ public final class Calculations {
         return angle + turns * 360;
     }
 
+    /** Empirical distance (inches) to flywheel target in RPM for the hive goal. */
     public static double velocity(double distance){
-        return 2.93909*(distance)+1460.15416;
+        return 6.29805 * distance + 3128.9;
     }
 }

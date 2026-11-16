@@ -9,7 +9,7 @@ import org.firstinspires.ftc.teamcode.util.LoopTiming;
 import org.firstinspires.ftc.teamcode.util.TurretConfig;
 
 @Configurable
-@TeleOp(name = "tip test", group = "Tuning")
+@TeleOp(name = "tip detection test", group = "Tuning")
 public class LimelightHiveTipTest extends OpMode {
     public static volatile int tagId = 35;
 

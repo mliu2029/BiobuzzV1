@@ -13,11 +13,11 @@ import org.firstinspires.ftc.teamcode.util.Calculations;
 import org.firstinspires.ftc.teamcode.util.HiveTarget;
 import org.firstinspires.ftc.teamcode.util.TurretConfig;
 import org.firstinspires.ftc.teamcode.util.TurretAngleEstimator;
-import org.firstinspires.ftc.teamcode.opmodes.teleop.mainTeleOp;
+import org.firstinspires.ftc.teamcode.opmodes.teleop.MainTeleOp;
 
 @Configurable
 @NextTeleop(name = "odo turret test", group = "Tuning")
-public class OdoTurretTest extends mainTeleOp {
+public class OdoTurretTest extends MainTeleOp {
     public static volatile double shooterVelocity = 0;
     public static volatile boolean autoShooterVelocity = true;
     public static volatile boolean blueAlliance = false;
@@ -29,105 +29,47 @@ public class OdoTurretTest extends mainTeleOp {
     }
 
     @Override
-    protected Alliance getAlliance() {
-        return blueAlliance ? Alliance.BLUE : Alliance.RED;
-    }
-
-    @Override
-    protected double getShooterTargetVelocity() {
-        double requestedVelocity = shooterVelocity;
-        if (!Double.isFinite(requestedVelocity) || requestedVelocity <= 0) return 0;
-        if (!autoShooterVelocity) return requestedVelocity;
-        double distanceInches = getGoalDistanceInches();
-        if (!Double.isFinite(distanceInches) || distanceInches < 0) return 0;
-        double velocity = Calculations.velocity(distanceInches);
-        return Double.isFinite(velocity) ? Math.max(0, velocity) : 0;
-    }
-
-    @Override
-    protected void setShooterTargetVelocity(double velocity) {
-        shooterVelocity = Double.isFinite(velocity) ? Math.max(0, velocity) : 0;
-    }
-
-    @Override
-    protected void adjustVelocity(double change) {
-        if (autoShooterVelocity) {
-            if (shooterVelocity > 0) shooterVelocity = getShooterTargetVelocity();
-            autoShooterVelocity = false;
-        }
-        super.adjustVelocity(change);
-    }
-
-    protected double getGoalDistanceInches() {
-        Pose pose = robot.Drivetrain().getFollower().pose();
-        HiveTarget goal = robot.Turret().getTarget();
-        return pose == null || !Double.isFinite(pose.x()) || !Double.isFinite(pose.y())
-                ? Double.NaN : Math.hypot(goal.x - pose.x(), goal.y - pose.y());
-    }
-
-    @Override
     protected void configureAdditionalControls(CommandGamepad driver, CommandGamepad driver2) {
-        driver2.cross().onTrue(Commands.instant(() -> useVision = !useVision));
-        driver2.dpadUp().onTrue(robot.Turret().stopTurret);
-        driver2.dpadRight().onTrue(robot.Turret().aimTurret);
-    }
-    @Override
-    public void disabledPeriodic() {
-        if (!telemetryDue(System.nanoTime())) return;
-        Pose startingPose = getStartingPose();
-        telemetry.addData("Status", "Initialized");
-        telemetry.addData("Alliance", getAlliance());
-        telemetry.addData("Aim source", visionModeLabel());
-        telemetry.addData("Shooter speed mode", autoShooterVelocity ? "AUTO DISTANCE" : "MANUAL");
-        telemetry.addData("3D AprilTag pipeline", TurretConfig.pipeline);
-        telemetry.addData("Auto end pose (inches / degrees)", "x=%.2f y=%.2f heading=%.1f",
-                startingPose.x(), startingPose.y(), Math.toDegrees(startingPose.heading()));
-
-        telemetry.update();
-    }
-    @Override
-    protected double getStartingTurretDegrees() {
-        return 0;
+        driver.circle().onTrue(Commands.instant(() -> {
+            boolean vision = !TurretAngleEstimator.applyVisionCorrections;
+            TurretAngleEstimator.applyVisionCorrections = vision;
+            robot.turret.setOdometryVisionEnabled(vision);
+        }));
     }
 
     @Override
-    protected void startTurretAim() {
-        Follower follower = robot.Drivetrain().getFollower();
-        robot.Turret().useOdometryAim(follower::pose, follower::velocity);
-        updateTurretAim();
-    }
-
-    @Override
-    protected void updateTurretAim() {
-        robot.Turret().setAlliance(getAlliance());
-        if (useVision) robot.Limelight().setPipeline(TurretConfig.pipeline);
-        robot.Turret().setOdometryVisionEnabled(useVision);
+    protected void updateDrive() {
+        if (autoShooterVelocity) {
+            Follower follower = robot.drivetrain.getFollower();
+            HiveTarget hive = robot.turret.getTarget();
+            if (follower != null && hive != null) {
+                Pose pose = follower.pose();
+                double dist = Math.hypot(hive.x - pose.x(), hive.y - pose.y());
+                shooterVelocity = Calculations.velocity(dist);
+            }
+        }
+        setShooterTargetVelocity(shooterVelocity);
+        robot.turret.setOdometryVisionEnabled(useVision);
     }
 
     @Override
     protected void addAdditionalDriverTelemetry() {
-        Pose pose = robot.Drivetrain().getFollower().pose();
-        HiveTarget goal = robot.Turret().getTarget();
-        double distanceInches = getGoalDistanceInches();
-        addDriverData("Goal (selected by odometry)", goal);
-        addDriverData("Turret alliance / accepted hive tags", robot.Turret().getAlliance()
-                + " / " + goal.firstTagId + "-" + (goal.firstTagId + 3));
-        addDriverData("Distance to goal (in, odometry)", Double.isFinite(distanceInches)
-                ? String.format(Locale.US, "%.1f", distanceInches) : "Unavailable");
-        addDriverData("Pose (inches / degrees)", pose == null ? "Unavailable"
-                : String.format(Locale.US, "x=%.2f y=%.2f heading=%.1f",
-                        pose.x(), pose.y(), Math.toDegrees(pose.heading())));
-        addDriverData("Turret chassis angle / saved offset (deg)", String.format(Locale.US,
-                "%.1f / %+.1f", robot.Turret().getChassisDegrees(),
-                robot.Turret().getOdometryAngleOffsetDegrees()));
-        addDriverData("Vision correction", robot.Turret().getOdometryCorrectionStatus());
-        addDriverData("Shooter speed mode", autoShooterVelocity ? "AUTO DISTANCE" : "MANUAL");
-    }
-
-    private static String visionModeLabel() {
-        return !useVision ? "ODOMETRY ONLY"
-                : TurretAngleEstimator.applyVisionCorrections
-                        ? "LIMELIGHT 3D; odometry fallback; stationary offset learning ON"
-                        : "LIMELIGHT 3D; odometry fallback; stationary offset learning OFF";
+        Follower follower = robot.drivetrain.getFollower();
+        Pose pose = follower != null ? follower.pose() : null;
+        HiveTarget hive = robot.turret.getTarget();
+        double dist = pose != null && hive != null
+                ? Math.hypot(hive.x - pose.x(), hive.y - pose.y()) : Double.NaN;
+        addDriverData("Shooter target / actual", String.format(Locale.US, "%.0f / %.0f",
+                robot.shooter.getTargetVelocity(), robot.shooter.getFlywheelVelocity()));
+        addDriverData("Hive dist", Double.isFinite(dist)
+                ? String.format(Locale.US, "%.1f in", dist) : "--");
+        addDriverData("Vision enabled", useVision);
+        addDriverData("Stillness / vision status", robot.turret.getOdometryCorrectionStatus());
+        addDriverData("Chassis turret deg", String.format(Locale.US, "%.1f",
+                robot.turret.getChassisDegrees()));
+        addDriverData("Vision chassis deg", String.format(Locale.US, "%.1f",
+                robot.turret.getVisionChassisDegrees()));
+        addDriverData("Angle offset deg", String.format(Locale.US, "%.1f",
+                robot.turret.getOdometryAngleOffsetDegrees()));
     }
 }

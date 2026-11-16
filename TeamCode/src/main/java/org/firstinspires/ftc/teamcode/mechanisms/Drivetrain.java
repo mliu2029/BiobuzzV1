@@ -21,6 +21,16 @@ public class Drivetrain implements Mechanism {
         stopImmediately();
     }
 
+    public final Command stopDrivetrain = instant(this::stopImmediately);
+
+    public Command stop() {
+        return stopDrivetrain;
+    }
+
+    public Command off() {
+        return stopDrivetrain;
+    }
+
     public Follower getFollower() {
         return follower;
     }

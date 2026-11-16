@@ -1,7 +1,12 @@
 package org.firstinspires.ftc.teamcode.opmodes.auto.core;
 
+import static com.pedropathing.ivy.groups.Groups.sequential;
+
 import com.pedropathing.follower.Follower;
+import com.pedropathing.ivy.Command;
+import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.math.Pose;
+import com.pedropathing.paths.Path;
 import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import org.firstinspires.ftc.teamcode.Robot;
@@ -10,9 +15,8 @@ import org.firstinspires.ftc.teamcode.util.OpModeStorage;
 import org.firstinspires.ftc.teamcode.util.LoopTiming;
 
 public abstract class BaseAuto extends NextOpMode {
-    private final Robot robot;
+    protected final Robot robot;
     private Follower follower;
-    protected final AutoCommands commands;
     private String currentPath = "Ready";
     private final LoopTiming loopTiming;
     private long lastTelemetryNanos;
@@ -26,16 +30,35 @@ public abstract class BaseAuto extends NextOpMode {
         this.robot = robot;
         this.loopTiming = loopTiming;
         telemetry.setMsTransmissionInterval(200);
-        commands = new AutoCommands(robot, status -> currentPath = status);
         telemetry.addData("Status", "Ready");
         telemetry.update();
     }
 
+    public Command initAuto() {
+        return sequential(
+                Commands.instant(() -> currentPath = "Starting"),
+                robot.shooter.runFlywheel,
+                robot.ramp.up,
+                Commands.instant(() -> {
+                    Follower fol = robot.drivetrain.getFollower();
+                    robot.turret.useOdometryAim(fol::pose, fol::velocity);
+                    robot.turret.setOdometryVisionEnabled(true);
+                }).requiring(robot.turret),
+                robot.intake.runIntake
+        );
+    }
+
+    public Command followPath(Path path, String name) {
+        return sequential(
+                Commands.instant(() -> currentPath = name),
+                robot.drivetrain.followPath(path)
+        );
+    }
+
     protected final void startAuto(Alliance alliance, Pose startPose) {
         OpModeStorage.autonomousEndTurretDegrees = 0.0;
-        robot.initialize(hardwareMap);
-        robot.Turret().initialize(hardwareMap, alliance);
-        follower = robot.Drivetrain().getFollower();
+        robot.initialize(hardwareMap, alliance);
+        follower = robot.drivetrain.getFollower();
         follower.setPose(startPose);
         OpModeStorage.saveAutonomousEndPose(startPose);
         follower.update();
@@ -64,7 +87,7 @@ public abstract class BaseAuto extends NextOpMode {
     public void end() {
         try {
             if (follower != null) {
-                OpModeStorage.saveAutonomousEndTurretDegrees(robot.Turret().getDegrees());
+                OpModeStorage.saveAutonomousEndTurretDegrees(robot.turret.getDegrees());
             }
         } finally {
             robot.stopImmediately();
