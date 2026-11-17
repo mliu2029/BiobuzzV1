@@ -7,6 +7,7 @@ import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes.FiducialResult;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorController;
+import com.qualcomm.robotcore.hardware.DcMotorImplEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import dev.nextftc.hardware.RobotController;
 import dev.nextftc.hardware.actuators.NextMotor;
@@ -23,8 +24,14 @@ import org.firstinspires.ftc.teamcode.util.TurretConfig;
 public class Turret implements Mechanism {
     private enum Mode { OFF, MANUAL, LIMELIGHT, ODOMETRY }
 
-    private final NextMotor turret = new NextMotor(RobotController.expansionHub(), 3,
-            Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree), 0.001);
+    private static final int MOTOR_PORT = 3;
+    private DcMotorImplEx turretMotor;
+    // Share one SDK motor between raw tick telemetry and NextMotor's degree-based PID.
+    // getCurrentPosition() reads whichever quadrature encoder is wired to this port.
+    private final NextMotor turret = new NextMotor(() -> {
+        turretMotor = new DcMotorImplEx(RobotController.expansionHub().getMotorController(), MOTOR_PORT);
+        return turretMotor;
+    }, Units.Degrees.of(0), 0.001);
     private final Limelight limelight;
     private final TurretAngleEstimator angleEstimator = new TurretAngleEstimator();
     private Supplier<Pose> poseSupplier;
@@ -35,7 +42,8 @@ public class Turret implements Mechanism {
     private boolean initialized;
     private boolean visionEnabled;
     private double startingDegrees;
-    private double zeroDegrees;
+    private int zeroTicks;
+    private double degreesPerEncoderTick = Double.NaN;
     private double manualDirection;
     private double targetDegrees = Double.NaN;
     private int recenterCount;
@@ -70,16 +78,17 @@ public class Turret implements Mechanism {
         this.alliance = alliance;
         target = alliance.close;
         this.startingDegrees = startingDegrees;
-        zeroDegrees = 0;
+        zeroTicks = 0;
         poseSupplier = null;
         velocitySupplier = null;
         visionEnabled = false;
         recenterCount = 0;
         DcMotorController controller = RobotController.expansionHub().getMotorController();
-        controller.setMotorPower(3, 0);
-        controller.setMotorMode(3, DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        controller.setMotorMode(3, DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        turret.setAnglePerCount(Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree));
+        controller.setMotorPower(MOTOR_PORT, 0);
+        // Relative encoder: the caller must establish the physical starting angle.
+        controller.setMotorMode(MOTOR_PORT, DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        controller.setMotorMode(MOTOR_PORT, DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        updateEncoderScale();
         turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         initialized = true;
         limelight.initialize(hardwareMap);
@@ -115,7 +124,7 @@ public class Turret implements Mechanism {
     public void resumeAutoAim() {
         if (!initialized) return;
         if (mode == Mode.MANUAL) {
-            zeroDegrees = turret.getEncoderPosition().into(Units.Degrees);
+            zeroTicks = getEncoderTicks();
             startingDegrees = 0;
             recenterCount++;
             angleEstimator.reset();
@@ -160,14 +169,21 @@ public class Turret implements Mechanism {
 
     @Override
     public void periodic() {
-        if (!initialized || mode == Mode.OFF) return;
-        turret.setAnglePerCount(Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree));
+        if (!initialized) return;
+        updateEncoderScale();
+        if (!TurretConfig.isEncoderConfigured()) {
+            resetAim();
+            motionStatus = "Turret disabled: configure encoder ratio and direction";
+            turret.update();
+            return;
+        }
+        if (mode == Mode.OFF) return;
         double current = getDegrees();
         if (mode == Mode.MANUAL) {
             double direction = manualDirection;
             if ((current <= TurretConfig.minDegrees && direction < 0)
                     || (current >= TurretConfig.maxDegrees && direction > 0)) direction = 0;
-            turret.setThrottle(direction * TurretConfig.manualPower * Math.signum(TurretConfig.ticksPerDegree));
+            turret.setThrottle(direction * TurretConfig.manualPower);
             motionStatus = direction == 0 ? "Manual: stopped" : "Manual bumper control";
             return;
         }
@@ -196,15 +212,24 @@ public class Turret implements Mechanism {
             return;
         }
 
-        double sign = Math.signum(TurretConfig.ticksPerDegree);
         turret.getPositionConstants()
-                .withP(sign * (mode == Mode.LIMELIGHT ? TurretConfig.visionP : TurretConfig.p))
-                .withI(sign * TurretConfig.i)
-                .withD(sign * TurretConfig.d)
-                .withS(sign * TurretConfig.staticPower * Math.min(1,
+                .withP(mode == Mode.LIMELIGHT ? TurretConfig.visionP : TurretConfig.p)
+                .withI(TurretConfig.i)
+                .withD(TurretConfig.d)
+                .withS(TurretConfig.staticPower * Math.min(1,
                         Math.abs(targetDegrees - current) / TurretConfig.staticPowerRampDegrees));
-        turret.setPositionSetpoint(Units.Degrees.of(targetDegrees - startingDegrees + zeroDegrees));
+        turret.setPositionSetpoint(Units.Degrees.of(
+                targetDegrees - startingDegrees + zeroTicks * degreesPerEncoderTick));
         motionStatus = isAligned() ? "Aligned; PID holding" : "Aiming";
+    }
+
+    private void updateEncoderScale() {
+        double scale = TurretConfig.isEncoderConfigured() ? TurretConfig.getDegreesPerEncoderTick() : 0;
+        if (Double.compare(scale, degreesPerEncoderTick) == 0) return;
+        degreesPerEncoderTick = scale;
+        turret.setAnglePerCount(Units.Degrees.of(scale));
+        angleEstimator.reset();
+        resetAim();
     }
 
     private void updateOdometry(Pose pose, double current) {
@@ -297,16 +322,27 @@ public class Turret implements Mechanism {
     }
 
     public double getDegrees() {
-        return initialized ? startingDegrees + turret.getEncoderPosition().into(Units.Degrees) - zeroDegrees
+        return initialized && TurretConfig.isEncoderConfigured()
+                ? startingDegrees + (getEncoderTicks() - (double) zeroTicks) * TurretConfig.getDegreesPerEncoderTick()
                 : Double.NaN;
     }
 
     public double getVelocityDegreesPerSecond() {
-        return turret.getEncoderVelocity().into(Units.DegreesPerSecond);
+        return initialized && TurretConfig.isEncoderConfigured()
+                ? turretMotor.getVelocity() * TurretConfig.getDegreesPerEncoderTick() : Double.NaN;
     }
 
     public int getEncoderTicks() {
-        return (int) Math.round(turret.getEncoderPosition().into(Units.Degrees) * TurretConfig.ticksPerDegree);
+        return initialized ? turretMotor.getCurrentPosition() : 0;
+    }
+
+    public double getPidErrorDegrees() { return targetDegrees - getDegrees(); }
+
+    public String getEncoderConfigurationStatus() {
+        return TurretConfig.isEncoderConfigured()
+                ? "REV V2 / ratio " + TurretConfig.encoderRevolutionsPerTurretRevolution
+                        + " / direction " + TurretConfig.encoderDirection
+                : "INVALID ratio/direction: turret output disabled";
     }
 
     public boolean isAligned() {

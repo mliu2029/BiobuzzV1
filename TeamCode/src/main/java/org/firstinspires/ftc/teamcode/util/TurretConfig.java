@@ -6,7 +6,14 @@ import com.bylazar.configurables.annotations.Configurable;
 public final class TurretConfig {
     private TurretConfig() { }
 
-    public static double ticksPerDegree = 28.0 * (1.0 + 46.0 / 17.0) * (92.0 / 24.0) / 360.0;
+    // REV Through Bore Encoder V2 (REV-11-3174), relative A/B quadrature counts.
+    public static final double ENCODER_COUNTS_PER_REVOLUTION = 8192.0;
+    // Encoder shaft revolutions / turret revolution: confirmed 24T encoder / 92T turret.
+    // Update this if either gear changes. Do not include the turret motor's gearbox.
+    public static double encoderRevolutionsPerTurretRevolution = 92.0 / 24.0;
+    // Set to -1 if raw counts decrease during positive (CCW) turret rotation.
+    // This changes feedback polarity only, not motor power direction.
+    public static int encoderDirection = 1;
     public static double minDegrees = -150;
     public static double maxDegrees = 80;
     public static double p = 0.01;
@@ -24,4 +31,17 @@ public final class TurretConfig {
     public static double acquireDegrees = 10;
     public static double visionUpdateDegrees = 2;
     public static double maxFrameAgeMs = 100;
+
+    public static boolean isEncoderConfigured() {
+        return Double.isFinite(encoderRevolutionsPerTurretRevolution)
+                && encoderRevolutionsPerTurretRevolution > 0
+                && (encoderDirection == 1 || encoderDirection == -1)
+                && Double.isFinite(getDegreesPerEncoderTick())
+                && getDegreesPerEncoderTick() != 0;
+    }
+
+    public static double getDegreesPerEncoderTick() {
+        return encoderDirection * 360.0
+                / (ENCODER_COUNTS_PER_REVOLUTION * encoderRevolutionsPerTurretRevolution);
+    }
 }

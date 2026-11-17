@@ -94,11 +94,12 @@ CAD alone cannot predict its effect on exit speed or departure direction.
 
 ## Changes and configuration mapping
 
-- `TurretConfig.ticksPerDegree` now uses the confirmed 92T/24T gearing. With the
-  retained 1620 RPM motor ratio and 28 motor counts/revolution, this is
-  `28 × (1 + 46/17) × (92/24) / 360 = 1.1049019608 ticks/degree`.
-  The previous 90T conversion commanded about 88.04° of physical rotation for
-  a nominal 90° request, assuming correct encoder scale and no backlash.
+- Turret feedback now uses a REV Through Bore Encoder V2 in relative quadrature
+  mode. The confirmed 24T encoder gear driving against the 92T turret gear gives
+  `8192 × (92/24) / 360 = 87.2296296296 counts/degree`. The motor's internal
+  gearbox is not part of this external encoder conversion. Change
+  `TurretConfig.encoderRevolutionsPerTurretRevolution` if the encoder gearing
+  changes; see [turret encoder setup](TURRET_ENCODER.md).
 - `SotmConfig.launchAngleDegrees` now starts at the CAD's nominal 70°.
 - `goalMinusReleaseHeightInches` remains unset. A starting estimate will be
   `goalAimPointHeightInches − 11.15`, once the intended field aim-point height

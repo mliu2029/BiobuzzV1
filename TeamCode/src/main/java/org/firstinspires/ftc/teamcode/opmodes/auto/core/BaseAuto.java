@@ -80,6 +80,11 @@ public abstract class BaseAuto extends NextOpMode {
         telemetry.addData("Pose (in / deg)", "%.1f / %.1f / %.1f",
                 pose.x(), pose.y(), Math.toDegrees(pose.heading()));
         telemetry.addData("Loop ms (avg / p95 / max; last 256)", loopTiming.summary());
+        telemetry.addData("Turret encoder", robot.turret.getEncoderConfigurationStatus());
+        telemetry.addData("Turret ticks / power", "%d / %.3f",
+                robot.turret.getEncoderTicks(), robot.turret.getPower());
+        telemetry.addData("Turret deg (actual / target / PID error)", "%.2f / %.2f / %.2f",
+                robot.turret.getDegrees(), robot.turret.getTargetDegrees(), robot.turret.getPidErrorDegrees());
         telemetry.update();
     }
 
