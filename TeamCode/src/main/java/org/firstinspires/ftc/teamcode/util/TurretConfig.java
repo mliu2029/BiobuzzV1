@@ -19,6 +19,8 @@ public final class TurretConfig {
     public static double toleranceDegrees = 2;
     public static double halfwayY = 70.75;
     public static int pipeline = 0;
+    // Set true after the camera's per-tag opening POIs have been configured and checked.
+    public static boolean limelightPoiConfigured = false;
 
     public static double txToCcwSign = -1;
     public static double acquireDegrees = 10;

@@ -6,16 +6,13 @@ import com.pedropathing.math.Velocity;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes.FiducialResult;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorController;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import dev.nextftc.hardware.RobotController;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import dev.nextftc.units.Units;
 import java.util.function.Supplier;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 import org.firstinspires.ftc.teamcode.util.Calculations;
-import org.firstinspires.ftc.teamcode.util.HiveAimGeometry;
 import org.firstinspires.ftc.teamcode.util.HiveTarget;
 import org.firstinspires.ftc.teamcode.util.TurretAngleEstimator;
 import org.firstinspires.ftc.teamcode.util.TurretConfig;
@@ -23,7 +20,7 @@ import org.firstinspires.ftc.teamcode.util.TurretConfig;
 public class Turret implements Mechanism {
     private enum Mode { OFF, MANUAL, LIMELIGHT, ODOMETRY }
 
-    private final NextMotor turret = new NextMotor(RobotController.expansionHub(), 3,
+    private final NextMotor turret = new NextMotor("turret",
             Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree), 0.001);
     private final Limelight limelight;
     private final TurretAngleEstimator angleEstimator = new TurretAngleEstimator();
@@ -75,10 +72,10 @@ public class Turret implements Mechanism {
         velocitySupplier = null;
         visionEnabled = false;
         recenterCount = 0;
-        DcMotorController controller = RobotController.expansionHub().getMotorController();
-        controller.setMotorPower(3, 0);
-        controller.setMotorMode(3, DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        controller.setMotorMode(3, DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        DcMotor motor = hardwareMap.get(DcMotor.class, "turret");
+        motor.setPower(0);
+        motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         turret.setAnglePerCount(Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree));
         turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         initialized = true;
@@ -181,8 +178,13 @@ public class Turret implements Mechanism {
         targetDegrees = Double.NaN;
         Pose pose = poseSupplier == null ? null : poseSupplier.get();
         mode = poseSupplier == null ? Mode.LIMELIGHT : Mode.ODOMETRY;
-        if (pose != null) updateOdometry(pose, current);
+        Velocity velocity = velocitySupplier == null ? null : velocitySupplier.get();
+        if (velocity != null) {
+            angleEstimator.updateStillness(System.nanoTime(), Math.hypot(velocity.vx, velocity.vy),
+                    Math.toDegrees(velocity.omega), getVelocityDegreesPerSecond());
+        }
         if (visionEnabled || poseSupplier == null) updateVision(pose, current);
+        if (visionTagId < 0 && pose != null) updateOdometry(pose, current);
         if (visionTagId < 0) {
             trackedTagId = -1;
             visionDegrees = Double.NaN;
@@ -215,15 +217,14 @@ public class Turret implements Mechanism {
             trackedTagId = -1;
             turret.getPositionPID().reset();
         }
-        Velocity velocity = velocitySupplier == null ? null : velocitySupplier.get();
-        if (velocity != null) {
-            angleEstimator.updateStillness(System.nanoTime(), Math.hypot(velocity.vx, velocity.vy),
-                    Math.toDegrees(velocity.omega), getVelocityDegreesPerSecond());
-        }
         targetDegrees = reachable(bearing(pose) - angleEstimator.getOffsetDegrees(), current);
     }
 
     private void updateVision(Pose pose, double current) {
+        if (!TurretConfig.limelightPoiConfigured) {
+            visionStatus = "Configure Limelight POIs before enabling vision";
+            return;
+        }
         limelight.setPipeline(TurretConfig.pipeline);
         LLResult result = limelight.getLatestResult();
         if (result == null || !result.isValid()) {
@@ -240,52 +241,51 @@ public class Turret implements Mechanism {
         boolean sameFrame = result.getTimestamp() > 0
                 ? result.getTimestamp() == frameTimestamp
                 : result.getControlHubTimeStamp() == frameReceiptTimestamp;
-        FiducialResult best = null;
-        HiveTarget bestCell = null;
-        double bestError = Double.NaN;
-        double bestSetpoint = Double.NaN;
+        HiveTarget cell = null;
+        FiducialResult visibleTag = null;
+        // SDK 12 has no primary-tag ID for getTx(). All returned tags must share one POI.
         for (FiducialResult tag : result.getFiducialResults()) {
             int id = tag.getFiducialId();
-            HiveTarget cell = alliance.close.acceptsTag(id) ? alliance.close
+            HiveTarget tagCell = alliance.close.acceptsTag(id) ? alliance.close
                     : alliance.far.acceptsTag(id) ? alliance.far : null;
-            if (cell == null || (pose != null && cell != target)) continue;
-            double error = cameraError(cell, tag, pose);
-            if (!Double.isFinite(error) || Math.abs(error) >= TurretConfig.acquireDegrees) continue;
-            double requested = sameFrame && id == trackedTagId ? visionDegrees
-                    : current + (Math.abs(error) > TurretConfig.visionUpdateDegrees
-                            ? TurretConfig.txToCcwSign * error : 0);
-            double setpoint = reachable(requested, current);
-            if (!Double.isFinite(setpoint)) continue;
-            if (best == null || id == trackedTagId
-                    || (best.getFiducialId() != trackedTagId && tag.getTargetArea() > best.getTargetArea())) {
-                best = tag;
-                bestCell = cell;
-                bestError = error;
-                bestSetpoint = setpoint;
+            if (tagCell == null || (cell != null && tagCell != cell)) {
+                visionStatus = "POI ambiguous: tags from different hives";
+                return;
             }
+            cell = tagCell;
+            if (visibleTag == null || id == trackedTagId
+                    || (visibleTag.getFiducialId() != trackedTagId
+                            && tag.getTargetArea() > visibleTag.getTargetArea())) visibleTag = tag;
         }
-        if (best == null) {
-            visionStatus = "No usable tag for selected hive";
+        if (visibleTag == null) {
+            visionStatus = "No alliance hive tag";
             return;
         }
-        trackedTagId = visionTagId = best.getFiducialId();
-        visionErrorDegrees = bestError;
-        visionDegrees = targetDegrees = bestSetpoint;
+        double error = result.getTx(); // Limelight already applied the tag-to-opening POI.
+        if (!Double.isFinite(error) || Math.abs(error) >= TurretConfig.acquireDegrees) {
+            visionStatus = "POI outside acquisition window";
+            return;
+        }
+        double requested = sameFrame && target == cell && Double.isFinite(visionDegrees) ? visionDegrees
+                : current + (Math.abs(error) > TurretConfig.visionUpdateDegrees
+                        ? TurretConfig.txToCcwSign * error : 0);
+        double setpoint = reachable(requested, current);
+        if (!Double.isFinite(setpoint)) {
+            visionStatus = "POI outside turret travel";
+            return;
+        }
+        trackedTagId = visionTagId = visibleTag.getFiducialId();
+        visionErrorDegrees = error;
+        visionDegrees = targetDegrees = setpoint;
         frameTimestamp = result.getTimestamp();
         frameReceiptTimestamp = result.getControlHubTimeStamp();
-        target = bestCell;
+        target = cell;
         mode = Mode.LIMELIGHT;
-        visionStatus = "2D opening: tag " + visionTagId;
+        visionStatus = "Limelight POI: " + cell + " (visible tag " + visionTagId + ")";
         if (pose != null) {
             angleEstimator.observe(System.nanoTime(), visionFrameAgeMs, bearing(pose), current,
-                    TurretConfig.txToCcwSign * bestError);
+                    TurretConfig.txToCcwSign * error);
         }
-    }
-
-    private double cameraError(HiveTarget cell, FiducialResult tag, Pose pose) {
-        return tag.getTargetXDegrees() + Math.toDegrees(Math.atan2(
-                -HiveAimGeometry.tagOffsetInches(cell, tag.getFiducialId()),
-                HiveAimGeometry.estimateDistanceInches(cell, pose)));
     }
 
     private double bearing(Pose pose) {

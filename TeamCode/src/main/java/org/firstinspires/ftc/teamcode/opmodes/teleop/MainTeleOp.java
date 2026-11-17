@@ -62,9 +62,7 @@ public abstract class MainTeleOp extends NextOpMode {
         driver.triangle().onTrue(robot.ramp.toggle);
 
         driver.circle().onTrue(robot.intake.runIntake);
-        driver.circle().onFalse(robot.intake.stopIntake);
         driver.square().onTrue(robot.intake.reverseIntake);
-        driver.square().onFalse(robot.intake.stopIntake);
         driver.cross().onTrue(robot.intake.stopIntake);
 
         driver.dpadUp().onTrue(robot.shooter.runFlywheel);
@@ -73,7 +71,7 @@ public abstract class MainTeleOp extends NextOpMode {
         driver.dpadLeft().onTrue(robot.shooter.adjustRPM(-50));
 
         driver.rightBumper().onTrue(parallel(robot.intake.runIntake, robot.transfer.feed));
-        driver.rightBumper().onFalse(parallel(robot.intake.stopIntake, robot.transfer.stopFeeding));
+        driver.rightBumper().onFalse(robot.transfer.stopFeeding);
 
         driver2.triangle().onTrue(robot.intake.stopIntake);
         driver2.square().onTrue(robot.turret.toggleRecenter);
