@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.firstinspires.ftc.teamcode.Robot;
+import org.firstinspires.ftc.teamcode.mechanisms.Drivetrain.PathResult;
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter;
 import org.firstinspires.ftc.teamcode.opmodes.auto.core.BaseAuto;
 import org.firstinspires.ftc.teamcode.opmodes.auto.modular.TwoTipPlan.Hive;
@@ -194,7 +195,7 @@ public abstract class BaseModularAuto extends BaseAuto {
                         .toArray(Command[]::new)));
     }
 
-    /** Adaptive route execution: tolerates minor odometry drift without hard-aborting. */
+    /** Accept small arrival error, but stop the routine when a leg fails or times out. */
     private Command travelLeg(TwoTipRoutes.Leg leg) {
         return Commands.lazy(() -> {
             if (aborted) return Command.NOOP;
@@ -206,17 +207,18 @@ public abstract class BaseModularAuto extends BaseAuto {
             return sequential(
                     followPath(leg.path(currentPose, alliance), leg.to.toString()),
                     Commands.instant(() -> {
-                        if (at(leg.to, 3.5, 12.0)) {
-                            location = leg.to;
-                        } else if (at(leg.to, 6.5, 20.0)) {
-                            // Arrived within extended tolerance; record location and proceed
-                            location = leg.to;
-                            status = "Arrived at " + leg.to + " (adapted)";
-                        } else {
-                            // Point off target; update location to target so next leg can continue
-                            location = leg.to;
-                            status = "Recovered arrival at " + leg.to;
+                        PathResult result = robot.drivetrain.getLastPathResult();
+                        if (result != PathResult.COMPLETED || !at(leg.to, 6.5, 20.0)) {
+                            aborted = true;
+                            monitoring = false;
+                            status = "Stopped: " + leg.from + " -> " + leg.to + " ("
+                                    + (result == PathResult.COMPLETED ? "arrival outside tolerance" : result) + ")";
+                            robot.stopImmediately();
+                            return;
                         }
+                        boolean adapted = !at(leg.to, 3.5, 12.0);
+                        location = leg.to;
+                        status = "Arrived at " + leg.to + (adapted ? " (adapted)" : "");
                     })
             );
         });
@@ -225,12 +227,13 @@ public abstract class BaseModularAuto extends BaseAuto {
     private boolean at(Stop stop, double distanceTol, double headingTol) {
         Pose actual = follower.pose();
         Pose target = TwoTipRoutes.transformPose(stop.pose, alliance);
-        return TwoTipRoutes.distance(actual, target) <= distanceTol
-                && Math.abs(Calculations.normalize(Math.toDegrees(actual.heading() - target.heading()))) <= headingTol;
+        return isAt(actual, target, distanceTol, headingTol);
     }
 
-    private boolean at(Stop stop) {
-        return at(stop, 3.5, 12.0);
+    static boolean isAt(Pose actual, Pose target, double distanceTol, double headingTol) {
+        return actual != null && target != null
+                && TwoTipRoutes.distance(actual, target) <= distanceTol
+                && Math.abs(Calculations.normalize(Math.toDegrees(actual.heading() - target.heading()))) <= headingTol;
     }
 
     private Command park() {

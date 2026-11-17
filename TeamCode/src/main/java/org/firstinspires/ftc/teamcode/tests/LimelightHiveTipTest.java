@@ -26,7 +26,8 @@ public class LimelightHiveTipTest extends OpMode {
         telemetry.setMsTransmissionInterval(100);
         telemetry.addLine("Keep chassis and turret still, with the watched tag visible.");
         telemetry.addLine("Set tagId in Panels. After START, press D1 Cross/A to begin.");
-        telemetry.addLine("After seeing the tag, 200 ms without a fresh sighting counts as a tip.");
+        telemetry.addLine("After seeing the tag, 200 ms of fresh frames without it suggests a tip.");
+        telemetry.addLine("Camera gaps or pipeline changes report UNKNOWN; Cross/A re-arms.");
         telemetry.update();
     }
 

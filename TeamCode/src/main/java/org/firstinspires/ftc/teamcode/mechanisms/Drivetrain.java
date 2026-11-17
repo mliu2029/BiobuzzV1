@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.behaviors.EndCondition;
-import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.ivy.pedro.PedroCommands;
 import com.pedropathing.paths.Path;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -12,9 +11,13 @@ import dev.nextftc.robot.Mechanism;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 
 public class Drivetrain implements Mechanism {
-    private static final double PATH_TIMEOUT_MS = 5000;
+    private static final long PATH_TIMEOUT_NANOS = 5_000_000_000L;
+
+    public enum PathResult { NOT_STARTED, RUNNING, COMPLETED, TIMED_OUT, CANCELLED }
 
     private Follower follower;
+    private long pathStartedNanos;
+    private PathResult pathResult = PathResult.NOT_STARTED;
 
     public void initialize(HardwareMap hardwareMap) {
         follower = Constants.create(hardwareMap);
@@ -44,16 +47,32 @@ public class Drivetrain implements Mechanism {
                 .setEnd(condition -> stopImmediately());
     }
 
+    public PathResult getLastPathResult() {
+        return pathResult;
+    }
+
     public Command followPath(Path path) {
         return PedroCommands.follow(follower, path)
-                .setDone(() -> follower.atParametricEnd() && !follower.isBusy())
+                .setStart(() -> {
+                    pathResult = PathResult.RUNNING;
+                    pathStartedNanos = System.nanoTime();
+                    follower.follow(path);
+                })
+                .setDone(() -> pathFinished()
+                        || System.nanoTime() - pathStartedNanos >= PATH_TIMEOUT_NANOS)
                 .setEnd(condition -> {
                     if (condition != EndCondition.NATURALLY) {
-                        stopImmediately();
+                        pathResult = PathResult.CANCELLED;
+                    } else {
+                        pathResult = pathFinished() ? PathResult.COMPLETED : PathResult.TIMED_OUT;
                     }
+                    if (pathResult != PathResult.COMPLETED) stopImmediately();
                 })
-                .requiring(this)
-                .raceWith(Commands.waitMs(PATH_TIMEOUT_MS));
+                .requiring(this);
+    }
+
+    private boolean pathFinished() {
+        return follower.atParametricEnd() && !follower.isBusy();
     }
 
     public void stopImmediately() {
