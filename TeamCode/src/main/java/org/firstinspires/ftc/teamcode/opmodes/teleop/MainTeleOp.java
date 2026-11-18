@@ -183,7 +183,7 @@ public abstract class MainTeleOp extends NextOpMode {
             }
         }
 
-        updateHaptics();
+//        updateHaptics();
         if (telemetryDue(System.nanoTime())) updateDriverTelemetry();
     }
 

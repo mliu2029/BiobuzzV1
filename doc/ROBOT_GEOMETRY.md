@@ -138,14 +138,11 @@ above the nominal floor. Those are not fixed robot-space camera coordinates
 throughout turret travel. The exterior CAD lens face also does not establish
 the optical entrance pupil or runtime image rotation/crosshair calibration.
 
-Turret vision now consumes the Limelight's POI-adjusted `tx`; the camera owns
-the tag-to-opening transformation. It does not use a fixed robot-space camera
-pose or a robot-side camera mounting-angle field. Per-tag POI setup and the
-retained field CAD dimensions are documented in [Limelight aiming](LIMELIGHT_AIMING.md).
-A future robot-space camera transform should use the turret encoder angle and
-established optical reference. Limelight documents camera space at the lens,
-with right/down/forward axes; see its
-[coordinate-system reference](https://docs.limelightvision.io/docs/docs-limelight/pipeline-apriltag/apriltag-coordinate-systems).
+Turret vision now uses raw per-tag horizontal angles with a distance-aware
+horizontal offset from odometry. It does not consume 3D poses, camera POIs, or a
+robot-space camera transform. The simple model approximates camera perspective;
+check tag consistency and near/far aiming on the robot. Setup and retained field
+CAD dimensions are documented in [Limelight aiming](LIMELIGHT_AIMING.md).
 
 Full-precision values, assumptions, and unresolved inputs are saved in
 [the geometry JSON](data/robot-geometry.json).

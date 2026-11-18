@@ -14,7 +14,7 @@ public class Intake implements Mechanism {
     public static volatile double stallVelocityRadPerSec = 5.0;
     public static volatile double stallDwellMs = 250.0;
 
-    private final NextMotor intake = new NextMotor(RobotController.expansionHub(),2);
+    private final NextMotor intake = new NextMotor("intake");
     private boolean initialized;
     private long stallConditionStartNanos = 0;
     private boolean stalled = false;

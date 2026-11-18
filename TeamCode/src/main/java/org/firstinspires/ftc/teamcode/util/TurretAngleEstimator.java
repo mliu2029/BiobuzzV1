@@ -2,10 +2,10 @@ package org.firstinspires.ftc.teamcode.util;
 
 import com.bylazar.configurables.annotations.Configurable;
 
-/** Captures one stationary correction each time a usable tag is acquired after being lost. */
+/** Calibrates the encoder angle from one stationary camera observation per tag acquisition. */
 @Configurable
 public final class TurretAngleEstimator {
-    // OFF clears/bypasses the correction. Turn ON to arm one new stationary measurement.
+    // OFF freezes the learned encoder zero. Turn ON to arm a new stationary measurement.
     public static volatile boolean applyVisionCorrections = true;
     private static final double STILL_DWELL_MS = 200;
     private double offsetDegrees;
@@ -36,7 +36,8 @@ public final class TurretAngleEstimator {
     public void updateStillness(long nowNanos, double speedInchesPerSecond,
                                double turnDegreesPerSecond, double turretDegreesPerSecond) {
         if (!applyVisionCorrections) {
-            reset();
+            correctedWhileVisible = false;
+            resetStillness();
             return;
         }
         if (correctedWhileVisible) return;
@@ -65,21 +66,29 @@ public final class TurretAngleEstimator {
             return false;
         }
         visionChassisDegrees = Calculations.normalize(goalDegrees - cameraErrorCcwDegrees);
-        offsetDegrees = Calculations.normalize(visionChassisDegrees - encoderDegrees);
+        double measuredOffset = Calculations.normalize(visionChassisDegrees - encoderDegrees);
+        offsetDegrees += Calculations.normalize(measuredOffset - offsetDegrees);
         corrected = true;
         correctedWhileVisible = true;
-        status = "CORRECTED ONCE; holding until tag is lost";
+        status = "Encoder zero calibrated; holding until tag is lost";
         return true;
     }
 
+    /** Continuous calibrated angle; do not wrap across a mechanical travel limit. */
     public double chassisDegrees(double encoderDegrees) {
-        return Calculations.normalize(encoderDegrees + getOffsetDegrees());
+        return encoderDegrees + offsetDegrees;
     }
 
-    public double getOffsetDegrees() { return applyVisionCorrections ? offsetDegrees : 0; }
+    /** Inverse conversion used for the motor PID's raw encoder setpoint. */
+    public double encoderDegrees(double chassisDegrees) {
+        return chassisDegrees - offsetDegrees;
+    }
+
+    public double getOffsetDegrees() { return offsetDegrees; }
     public double getVisionChassisDegrees() { return visionChassisDegrees; }
-    public boolean hasCorrection() { return applyVisionCorrections && corrected; }
+    public boolean hasCorrection() { return corrected; }
     public String getStatus() {
-        return applyVisionCorrections ? status : "Correction OFF; turn ON to arm one measurement";
+        if (applyVisionCorrections) return status;
+        return corrected ? "Learning OFF; holding calibrated encoder zero" : "Learning OFF";
     }
 }

@@ -14,18 +14,18 @@ import dev.nextftc.units.Units;
 public class Transfer implements Mechanism {
     public static final double ticksPerRevolution = 28.0;
 
-    public static volatile double openPosition = 0.13;
-    public static volatile double blockedPosition = 0.7;
+    public static volatile double openPosition = 0.5;
+    public static volatile double blockedPosition = 0.2;
     public static volatile double closedReverseRPM = 2140;
 
     // NextFTC Velocity PID & Feedforward Constants
-    public static volatile double kP = 0.00004667;
+    public static volatile double kP = 0.000002;
     public static volatile double kI = 0.0;
     public static volatile double kD = 0.0;
-    public static volatile double kV = 0.0001997;
+    public static volatile double kV = 0.000204;
     public static volatile double rollerDefaultRPM = 2570;
 
-    private final NextServo transfer = new NextServo(RobotController.expansionHub(),2);
+    private final NextServo transfer = new NextServo("transfer");
     private final NextMotor roller = new NextMotor("rollers", Units.Rotations.of(1.0 / ticksPerRevolution));
     private boolean servoFreeMode = false;
     private boolean feeding;

@@ -134,8 +134,8 @@ public abstract class BaseModularAuto extends BaseAuto {
         startedNanos = System.nanoTime();
         sequential(
                 initAuto(),
-                Commands.lazy(() -> hive == startSide ? Command.NOOP : travel(TwoTipRoutes.shooting(hive))),
-                Commands.lazy(() -> aborted ? Command.NOOP : shootAndCheck()),
+                Commands.lazy(() -> hive == startSide ? skip() : travel(TwoTipRoutes.shooting(hive))),
+                Commands.lazy(() -> aborted ? skip() : shootAndCheck()),
                 Commands.lazy(this::nextCycle),
                 Commands.lazy(this::park)
         ).raceWith(Commands.waitMs(STOP_AFTER_MS)).then(
@@ -148,24 +148,29 @@ public abstract class BaseModularAuto extends BaseAuto {
         ).schedule();
     }
 
+    // Ivy 1.1.1's Command.NOOP never finishes; skipped sequence steps must complete.
+    static Command skip() {
+        return Commands.instant(() -> { });
+    }
+
     /** Every reload consumes one configured pickup. Tip/attempt decisions are made at runtime. */
     private Command nextCycle() {
-        if (aborted || pickupIndex >= pickups.size()) return Command.NOOP;
+        if (aborted || pickupIndex >= pickups.size()) return skip();
         if (elapsedMs() >= STOP_AFTER_MS - MIN_TIME_FOR_CYCLE_MS) {
             status = "Time budget low; parking";
-            return Command.NOOP;
+            return skip();
         }
         Hive next = plan.next(hive, mode);
-        if (next == null) { status = "Hive attempts complete"; return Command.NOOP; }
+        if (next == null) { status = "Hive attempts complete"; return skip(); }
         Pickup pickup = pickups.get(pickupIndex++);
         hive = next;
         return sequential(
                 collect(pickup),
-                Commands.lazy(() -> aborted || elapsedMs() >= STOP_AFTER_MS - MIN_TIME_FOR_CYCLE_MS ? Command.NOOP
+                Commands.lazy(() -> aborted || elapsedMs() >= STOP_AFTER_MS - MIN_TIME_FOR_CYCLE_MS ? skip()
                         : sequential(
                                 travel(TwoTipRoutes.shooting(hive)),
                                 Commands.lazy(() -> aborted || elapsedMs() >= STOP_AFTER_MS
-                                        ? Command.NOOP : shootAndCheck()),
+                                        ? skip() : shootAndCheck()),
                                 Commands.lazy(this::nextCycle)))
         );
     }
@@ -179,7 +184,7 @@ public abstract class BaseModularAuto extends BaseAuto {
                     robot.intake.restart();
                 }),
                 travel(TwoTipRoutes.pickup(pickup)),
-                Commands.lazy(() -> aborted ? Command.NOOP : sequential(
+                Commands.lazy(() -> aborted ? skip() : sequential(
                         Commands.waitMs(pickupDwell),
                         Commands.instant(() -> {
                             robot.turret.useOdometryAim(follower::pose, follower::velocity);
@@ -189,7 +194,7 @@ public abstract class BaseModularAuto extends BaseAuto {
     }
 
     private Command travel(Stop destination) {
-        return Commands.lazy(() -> aborted ? Command.NOOP
+        return Commands.lazy(() -> aborted ? skip()
                 : sequential(routes.between(location, destination).stream()
                         .map(this::travelLeg)
                         .toArray(Command[]::new)));
@@ -198,7 +203,7 @@ public abstract class BaseModularAuto extends BaseAuto {
     /** Accept small arrival error, but stop the routine when a leg fails or times out. */
     private Command travelLeg(TwoTipRoutes.Leg leg) {
         return Commands.lazy(() -> {
-            if (aborted) return Command.NOOP;
+            if (aborted) return skip();
             Pose currentPose = follower.pose();
             // Generous start check - Pedro dynamically plans from currentPose to target
             if (!at(leg.from, 8.0, 30.0)) {
@@ -237,7 +242,7 @@ public abstract class BaseModularAuto extends BaseAuto {
     }
 
     private Command park() {
-        if (aborted) return Command.NOOP;
+        if (aborted) return skip();
         status = "Parking (" + parkSide + ")";
         return sequential(
                 Commands.instant(() -> {

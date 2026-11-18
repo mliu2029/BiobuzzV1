@@ -19,6 +19,7 @@ import org.firstinspires.ftc.teamcode.util.TurretConfig;
 
 public class Turret implements Mechanism {
     private enum Mode { OFF, MANUAL, LIMELIGHT, ODOMETRY }
+    private static final double[] TAG_X_INCHES = {-6.5, -2.75, 2.75, 6.5};
 
     private final NextMotor turret = new NextMotor("turret",
             Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree), 0.001);
@@ -68,6 +69,7 @@ public class Turret implements Mechanism {
         target = alliance.close;
         this.startingDegrees = startingDegrees;
         zeroDegrees = 0;
+        angleEstimator.reset();
         poseSupplier = null;
         velocitySupplier = null;
         visionEnabled = false;
@@ -104,8 +106,9 @@ public class Turret implements Mechanism {
         resetAim();
     }
 
+    /** Re-arm learning after a pose/mode change without discarding the calibrated encoder zero. */
     public void resetOdometryAimCorrection() {
-        angleEstimator.reset();
+        angleEstimator.tagLost();
         resetAim();
     }
 
@@ -184,6 +187,7 @@ public class Turret implements Mechanism {
                     Math.toDegrees(velocity.omega), getVelocityDegreesPerSecond());
         }
         if (visionEnabled || poseSupplier == null) updateVision(pose, current);
+        current = getDegrees(); // A fresh vision observation may have recalibrated the encoder zero.
         if (visionTagId < 0 && pose != null) updateOdometry(pose, current);
         if (visionTagId < 0) {
             trackedTagId = -1;
@@ -205,7 +209,7 @@ public class Turret implements Mechanism {
                 .withD(sign * TurretConfig.d)
                 .withS(sign * TurretConfig.staticPower * Math.min(1,
                         Math.abs(targetDegrees - current) / TurretConfig.staticPowerRampDegrees));
-        turret.setPositionSetpoint(Units.Degrees.of(targetDegrees - startingDegrees + zeroDegrees));
+        turret.setPositionSetpoint(Units.Degrees.of(encoderSetpointDegrees()));
         motionStatus = isAligned() ? "Aligned; PID holding" : "Aiming";
     }
 
@@ -217,14 +221,10 @@ public class Turret implements Mechanism {
             trackedTagId = -1;
             turret.getPositionPID().reset();
         }
-        targetDegrees = reachable(bearing(pose) - angleEstimator.getOffsetDegrees(), current);
+        targetDegrees = reachable(bearing(pose), current);
     }
 
     private void updateVision(Pose pose, double current) {
-        if (!TurretConfig.limelightPoiConfigured) {
-            visionStatus = "Configure Limelight POIs before enabling vision";
-            return;
-        }
         limelight.setPipeline(TurretConfig.pipeline);
         LLResult result = limelight.getLatestResult();
         if (result == null || !result.isValid()) {
@@ -241,51 +241,67 @@ public class Turret implements Mechanism {
         boolean sameFrame = result.getTimestamp() > 0
                 ? result.getTimestamp() == frameTimestamp
                 : result.getControlHubTimeStamp() == frameReceiptTimestamp;
-        HiveTarget cell = null;
-        FiducialResult visibleTag = null;
-        // SDK 12 has no primary-tag ID for getTx(). All returned tags must share one POI.
+        FiducialResult best = null;
+        HiveTarget bestCell = null;
+        double bestError = Double.NaN;
+        double bestSetpoint = Double.NaN;
         for (FiducialResult tag : result.getFiducialResults()) {
             int id = tag.getFiducialId();
-            HiveTarget tagCell = alliance.close.acceptsTag(id) ? alliance.close
+            HiveTarget cell = alliance.close.acceptsTag(id) ? alliance.close
                     : alliance.far.acceptsTag(id) ? alliance.far : null;
-            if (tagCell == null || (cell != null && tagCell != cell)) {
-                visionStatus = "POI ambiguous: tags from different hives";
-                return;
+            if (cell == null) continue;
+            double error = cameraError(cell, tag, pose);
+            if (!Double.isFinite(error) || Math.abs(error) >= TurretConfig.acquireDegrees) continue;
+            double requested = sameFrame && id == trackedTagId ? visionDegrees
+                    : current + (Math.abs(error) > TurretConfig.visionUpdateDegrees
+                            ? TurretConfig.txToCcwSign * error : 0);
+            double setpoint = reachable(requested, current);
+            if (!Double.isFinite(setpoint)) continue;
+            if (best == null || id == trackedTagId
+                    || (best.getFiducialId() != trackedTagId && tag.getTargetArea() > best.getTargetArea())) {
+                best = tag;
+                bestCell = cell;
+                bestError = error;
+                bestSetpoint = setpoint;
             }
-            cell = tagCell;
-            if (visibleTag == null || id == trackedTagId
-                    || (visibleTag.getFiducialId() != trackedTagId
-                            && tag.getTargetArea() > visibleTag.getTargetArea())) visibleTag = tag;
         }
-        if (visibleTag == null) {
-            visionStatus = "No alliance hive tag";
+        if (best == null) {
+            visionStatus = "No usable alliance hive tag";
             return;
         }
-        double error = result.getTx(); // Limelight already applied the tag-to-opening POI.
-        if (!Double.isFinite(error) || Math.abs(error) >= TurretConfig.acquireDegrees) {
-            visionStatus = "POI outside acquisition window";
-            return;
-        }
-        double requested = sameFrame && target == cell && Double.isFinite(visionDegrees) ? visionDegrees
-                : current + (Math.abs(error) > TurretConfig.visionUpdateDegrees
-                        ? TurretConfig.txToCcwSign * error : 0);
-        double setpoint = reachable(requested, current);
-        if (!Double.isFinite(setpoint)) {
-            visionStatus = "POI outside turret travel";
-            return;
-        }
-        trackedTagId = visionTagId = visibleTag.getFiducialId();
-        visionErrorDegrees = error;
-        visionDegrees = targetDegrees = setpoint;
+        trackedTagId = visionTagId = best.getFiducialId();
+        visionErrorDegrees = bestError;
+        visionDegrees = targetDegrees = bestSetpoint;
         frameTimestamp = result.getTimestamp();
         frameReceiptTimestamp = result.getControlHubTimeStamp();
-        target = cell;
+        target = bestCell;
         mode = Mode.LIMELIGHT;
-        visionStatus = "Limelight POI: " + cell + " (visible tag " + visionTagId + ")";
-        if (pose != null) {
-            angleEstimator.observe(System.nanoTime(), visionFrameAgeMs, bearing(pose), current,
-                    TurretConfig.txToCcwSign * error);
+        visionStatus = "2D opening: tag " + visionTagId;
+        learnEncoderAngle(pose, TurretConfig.txToCcwSign * bestError, sameFrame);
+    }
+
+    private void learnEncoderAngle(Pose pose, double cameraErrorCcwDegrees, boolean sameFrame) {
+        if (pose == null || sameFrame) return;
+        double previousOffset = angleEstimator.getOffsetDegrees();
+        if (angleEstimator.observe(System.nanoTime(), visionFrameAgeMs, bearing(pose),
+                getRawDegrees(), cameraErrorCcwDegrees)) {
+            // Rebase the held camera target too, so calibration does not move the motor by itself.
+            double shift = angleEstimator.getOffsetDegrees() - previousOffset;
+            visionDegrees = targetDegrees = reachable(targetDegrees + shift, getDegrees());
+            turret.getPositionPID().reset();
         }
+    }
+
+    private double encoderSetpointDegrees() {
+        return angleEstimator.encoderDegrees(targetDegrees) - startingDegrees + zeroDegrees;
+    }
+
+    private double cameraError(HiveTarget cell, FiducialResult tag, Pose pose) {
+        double distance = pose == null ? 50 : Math.hypot(cell.x - pose.x(), cell.y - pose.y());
+        if (!Double.isFinite(distance) || distance < 12) distance = 50;
+        double tagX = TAG_X_INCHES[tag.getFiducialId() - cell.firstTagId];
+        return tag.getTargetXDegrees() + Math.toDegrees(Math.atan2(-tagX, distance))
+                + TurretConfig.visionOffsetDegrees;
     }
 
     private double bearing(Pose pose) {
@@ -296,7 +312,12 @@ public class Turret implements Mechanism {
         return Calculations.reachableAngle(degrees, current, TurretConfig.minDegrees, TurretConfig.maxDegrees);
     }
 
+    /** Authoritative turret angle, including the camera-calibrated encoder zero. */
     public double getDegrees() {
+        return angleEstimator.chassisDegrees(getRawDegrees());
+    }
+
+    public double getRawDegrees() {
         return initialized ? startingDegrees + turret.getEncoderPosition().into(Units.Degrees) - zeroDegrees
                 : Double.NaN;
     }
@@ -311,7 +332,8 @@ public class Turret implements Mechanism {
 
     public boolean isAligned() {
         return mode != Mode.OFF && mode != Mode.MANUAL
-                && Math.abs(targetDegrees - getDegrees()) <= TurretConfig.toleranceDegrees;
+                && Math.abs(targetDegrees - getDegrees()) <= TurretConfig.toleranceDegrees
+                && (mode != Mode.LIMELIGHT || isVisionAligned());
     }
 
     public boolean isVisionAligned() {
@@ -331,8 +353,10 @@ public class Turret implements Mechanism {
     public double getVisionFrameAgeMs() { return visionFrameAgeMs; }
     public int getVisionPipeline() { return visionPipeline; }
     public int getRecenterCount() { return recenterCount; }
-    public double getChassisDegrees() { return angleEstimator.chassisDegrees(getDegrees()); }
+    public double getChassisDegrees() { return getDegrees(); }
     public double getVisionChassisDegrees() { return angleEstimator.getVisionChassisDegrees(); }
     public double getOdometryAngleOffsetDegrees() { return angleEstimator.getOffsetDegrees(); }
-    public String getOdometryCorrectionStatus() { return visionEnabled ? angleEstimator.getStatus() : "Vision disabled"; }
+    public String getOdometryCorrectionStatus() {
+        return (visionEnabled ? "" : "Vision disabled; ") + angleEstimator.getStatus();
+    }
 }

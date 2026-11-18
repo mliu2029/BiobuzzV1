@@ -22,7 +22,7 @@ public class Shooter implements Mechanism {
 
     public static volatile double defaultRPM = 3480.0;
 
-    private final NextMotor flywheel = new NextMotor(RobotController.expansionHub(),1, Units.Rotations.of(1.0 / TICKS_PER_REVOLUTION));
+    private final NextMotor flywheel = new NextMotor("flywheel", Units.Rotations.of(1.0 / TICKS_PER_REVOLUTION));
     private boolean enabled;
     private boolean initialized;
     private double targetRPM = defaultRPM;

@@ -1,21 +1,88 @@
-# Four-tag Limelight aiming
+# Simple 2D Limelight turret aiming
 
-Turret auto aim now reads the camera's POI-adjusted `LLResult.getTx()`.
-Limelight computes the tag-to-opening 3D transformation onboard. Robot code only
-turns that angular error into a NextFTC position setpoint. It does not read 3D
-poses or add a distance-based tag offset.
+The turret uses one AprilTag pipeline and raw per-tag horizontal angles. It
+tracks one usable alliance tag at a time and corrects its horizontal displacement
+from the opening using odometry distance. Limelight overrides odometry whenever
+a usable tag is available, including close/far hive selection. Odometry remains
+the fallback when no tag is usable. There is no camera POI, 3D pose processing,
+pipeline scanning, or SOTM in this path.
 
-Camera setup has not been verified on the robot. `TurretConfig.limelightPoiConfigured`
-defaults to `false`: vision reports that setup is required and odometry remains
-available. Set it to `true` only after completing the camera setup below.
+## Camera setup
 
-A usable Limelight POI overrides odometry, including close/far hive selection.
-SDK 12.0 exposes the primary target's `tx` but no corresponding primary-tag ID.
-Therefore, all fiducial results in a frame must belong to one alliance hive.
-With mixed hives or opponent tags, the turret falls back to odometry. The visible
-tag ID in telemetry is a retained reference tag, not a claim about which tag the
-camera selected for its primary output. Limelight selects that primary tag;
-robot code does not average or combine their raw angles.
+Pipeline 0 uses AprilTag Classic 36h11, 82.55 mm tags, 640x480 at 90 fps,
+detector downscale 1, and the existing calibration/exposure/gain settings.
+Full 3D Targeting is **No** and the camera POI Forward/Right/Up offsets are all
+zero. The ID filter includes 30 through 45. Robot code selects only alliance
+hive tags. The robot uses each tag's raw angle rather than the camera's primary
+result, so multiple visible hives do not share an angle accidentally.
+
+The original pipeline is saved in [the camera backup](limelight/before-poi-2026-11-17.json).
+A reusable 2D profile is [hive-2d.vpr](limelight/hive-2d.vpr). The camera remains
+on firmware 2025.1; this setup does not require per-tag map POIs or a firmware
+flash. The older field map is not used for this 2D correction.
+
+## Distance-aware horizontal correction
+
+The four tag centers, viewed from the front in ascending ID order, are
+-6.5, -2.75, +2.75, +6.5 inches from the opening center. The correction is:
+
+```text
+openingErrorDegrees = rawTagTxDegrees
+                    + degrees(atan2(-tagOffsetInches, rangeInches))
+                    + TurretConfig.visionOffsetDegrees
+```
+
+Range is odometry distance to the observed hive. If pose/range is unavailable or
+less than 12 inches, it uses the existing 50-inch fallback estimate. Accurate
+range improves centering; the fallback is an approximation. A 6.5-inch offset
+requires about 7.4 degrees at 50 inches and 3.7 degrees at 100 inches. A fixed
+angle or pixel correction cannot account for that distance change.
+
+This simple geometry approximates the camera-to-opening correction. Camera
+pitch/roll, shallow viewing angles, turret position, and field tolerances can
+leave residual error. It is not a full perspective projection. Check several
+distances and view angles before judging shot accuracy.
+
+## Tracking and control
+
+A usable tag stays locked even if another tag becomes larger. When it is lost
+or unusable, the largest usable alliance tag takes over. Each new camera frame
+updates one encoder setpoint. Repeated polls hold that setpoint; timestamps use
+the camera time with Control Hub receipt time as a fallback. Stale/wrong-pipeline
+frames and unreachable targets fall back to odometry.
+
+The camera update deadband is 1 degree. Native NextFTC position PID, existing
+friction compensation, travel limits, and manual recenter remain. Alignment requires
+both encoder and camera error within `toleranceDegrees` when vision is active.
+Gains were not retuned remotely.
+
+After 200 ms of stationary robot/turret motion, a fresh usable camera observation
+can calibrate the turret's software encoder zero. Aiming, alignment, travel checks,
+and handoff use that corrected angle. The motor PID target is converted back to
+raw encoder units, and the held camera target is rebased when calibration changes
+so the two corrections do not stack. Raw encoder ticks remain available for diagnostics.
+
+In `odo turret test`, **D2 D-pad Up** toggles learning; **D1 Circle** only starts
+the intake. Learning OFF holds the last calibrated zero. The `useVision` setting
+separately controls camera aiming. Tag loss, pose resets, and switching aim modes
+retain the zero and re-arm learning. Manual recenter establishes a new zero.
+
+## On-robot calibration
+
+1. Center the turret physically, verify encoder direction/zero, then view a hive
+   from near and far shooting distances. Confirm the odometry range is sensible.
+2. Cover three tags at a time and check that all four aim at the same opening.
+   A common left/right bias can be trimmed with `visionOffsetDegrees`. A bias
+   that changes with tag, distance, or viewing angle needs geometry/range checks.
+3. Check tag handoff and loss-to-odometry fallback. Then tune quiet stationary
+   PID settling and verify actual shots. Source tests and builds do not establish
+   physical aiming accuracy.
+
+## Retained CAD reference
+
+Only the horizontal tag spacing above is used by current aiming code. The
+following historical CAD measurements retain the provenance of the opening
+geometry; vertical/depth values are not used in the 2D runtime correction.
 
 The offsets use FTC SDK 12.0's `AprilTagGameDatabase.getBioBuzzCluster()`, checked
 against the supplied `am-5865-red1- Red Cell (Audience).step` and
@@ -91,73 +158,5 @@ Other cells use the same SDK cluster geometry with their respective IDs; the
 supplied STEP independently covers only the red audience cell. The tag rotation
 transforms the offset into camera coordinates before calculating the correction.
 
-## Camera setup
 
-1. Back up the camera's existing pipelines and field map. Confirm that its firmware
-   supports per-tag fmap POIs (introduced in Limelight OS 2026.1).
-2. In the AprilTag pipeline selected by `TurretConfig.pipeline` (default 0),
-   select 36h11, the correct calibration, and 82.55 mm / 3.25-inch tags.
-   Enable the 3D processing required for POI targeting.
-3. In the existing BioBuzz map, enter a separate opening POI for every hive tag.
-   Preserve its existing tag transforms and field coordinates.
-4. Enable **Use Map POI Offsets** (`use_fmap_poi`). Clear global UI and
-   NetworkTables POI overrides: nonzero overrides take priority over map POIs.
-5. Filter the pipeline to alliance hive IDs: red 30–37 or blue 38–45.
-   If both alliances share one pipeline, code will reject opponent/mixed frames.
-6. Verify each tag's POI marker lands at the same opening centroid in the map
-   visualizer. Check the live POI overlay and `tx` while viewing from both sides
-   and different ranges. Only then set `limelightPoiConfigured = true` in source
-   (or temporarily in Panels).
-
-The new fmap `poi` entry uses **[forward, left, down] in meters**, tag-relative.
-This differs from the older target-space XYZ table above. Converting that
-retained CAD offset as [Z, -X, Y] gives these starting values:
-
-| Tag IDs | Forward (m) | Left (m) | Down (m) |
-| --- | ---: | ---: | ---: |
-| 30, 34, 38, 42 | +0.146338544 | -0.165100 | -0.1825625 |
-| 31, 35, 39, 43 | +0.146338544 | -0.069850 | -0.1825625 |
-| 32, 36, 40, 44 | +0.146338544 | +0.069850 | -0.1825625 |
-| 33, 37, 41, 45 | +0.146338544 | +0.165100 | -0.1825625 |
-
-These are CAD-derived setup values, not physically validated calibration.
-Confirm the forward-axis direction and tag orientation in the installed firmware's
-visualizer before enabling aim; do not copy the old XYZ tuple directly.
-The red audience cell is the independently measured CAD source; the other cells
-reuse the SDK cluster geometry. This table is an addition to the current map,
-not a replacement map with invented tag poses.
-
-## Robot behavior
-
-The turret uses `result.getTx()` once for the opening. It never adds raw
-`FiducialResult.getTargetXDegrees()`, an odometry distance offset, or another POI.
-This prevents double correction. Camera crosshair/yaw must be aligned with the
-launcher; camera pitch is not used as a robot-side transform for this feature.
-
-Fresh, correct-pipeline POI frames inside `acquireDegrees` (10 degrees) override
-odometry if the resulting turret angle is reachable. When the same frame is
-polled repeatedly, its previous encoder setpoint is held. A fresh frame updates
-the setpoint if its POI error exceeds `visionUpdateDegrees` (2 degrees).
-Within that band, it holds the current angle for the fresh measurement.
-
-No usable POI means odometry chooses the alliance close/far hive using robot Y.
-Disabling vision also selects odometry. Native NextFTC position PID, encoder
-travel limits, manual recenter, and the existing static-power ramp remain.
-SOTM is not part of this aiming path.
-
-A stationary POI observation can still teach `TurretAngleEstimator` the
-odometry angle correction. Stillness is updated independently of which aiming
-source wins. Manual recenter or a pose reset clears the correction.
-
-## On-robot verification
-
-Confirm that covering individual tags leaves the opening aim consistent, and
-that losing all tags restores odometry. Check that repeated polls do not move
-the target again, and that a visible far hive can override a close hive chosen
-by odometry. Check turret encoder direction/zero and launcher alignment before
-judging shots. Source tests and builds do not establish physical accuracy.
-
-References:
-[POI targeting](https://docs.limelightvision.io/docs/docs-limelight/pipeline-apriltag/apriltag-3d),
-[per-tag POIs and override priority](https://docs.limelightvision.io/docs/docs-limelight/software-change-log),
-[FTC result API](https://docs.limelightvision.io/docs/docs-limelight/apis/ftc-programming).
+References: [Limelight AprilTag tracking](https://docs.limelightvision.io/docs/docs-limelight/pipeline-apriltag/apriltags).

@@ -8,6 +8,7 @@ import com.pedropathing.ivy.commands.Commands;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import dev.nextftc.robot.NextRobot;
 import java.util.Set;
@@ -21,13 +22,24 @@ import org.firstinspires.ftc.teamcode.mechanisms.Turret;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 
 public class Robot implements NextRobot {
-    public final Drivetrain drivetrain = new Drivetrain();
-    public final Intake intake = new Intake();
-    public final Shooter shooter = new Shooter();
-    public final Limelight limelight = new Limelight();
-    public final Turret turret = new Turret(limelight);
-    public final Transfer transfer = new Transfer();
-    public final Ramp ramp = new Ramp();
+    public final Drivetrain drivetrain;
+    public final Intake intake;
+    public final Shooter shooter;
+    public final Limelight limelight;
+    public final Turret turret;
+    public final Transfer transfer;
+    public final Ramp ramp;
+
+    public Robot() {
+        NextMotor.Companion.getMotorEventLoop().clear();
+        drivetrain = new Drivetrain();
+        intake = new Intake();
+        shooter = new Shooter();
+        limelight = new Limelight();
+        turret = new Turret(limelight);
+        transfer = new Transfer();
+        ramp = new Ramp();
+    }
 
     @NonNull
     @Override

@@ -16,7 +16,7 @@ import org.firstinspires.ftc.teamcode.util.TurretAngleEstimator;
 import org.firstinspires.ftc.teamcode.opmodes.teleop.MainTeleOp;
 
 @Configurable
-@NextTeleop(name = "odo turret test", group = "Tuning")
+@NextTeleop(name = "odo turret test (USE THIS FOR DP)", group = "Tuning")
 public class OdoTurretTest extends MainTeleOp {
     public static volatile double shooterVelocity = 0;
     public static volatile boolean autoShooterVelocity = true;
@@ -30,11 +30,8 @@ public class OdoTurretTest extends MainTeleOp {
 
     @Override
     protected void configureAdditionalControls(CommandGamepad driver, CommandGamepad driver2) {
-        driver.circle().onTrue(Commands.instant(() -> {
-            boolean vision = !TurretAngleEstimator.applyVisionCorrections;
-            TurretAngleEstimator.applyVisionCorrections = vision;
-            robot.turret.setOdometryVisionEnabled(vision);
-        }));
+        driver2.dpadUp().onTrue(Commands.instant(() ->
+                TurretAngleEstimator.applyVisionCorrections = !TurretAngleEstimator.applyVisionCorrections));
     }
 
     @Override
@@ -48,7 +45,9 @@ public class OdoTurretTest extends MainTeleOp {
                 shooterVelocity = Calculations.velocity(dist);
             }
         }
-        setShooterTargetVelocity(shooterVelocity);
+        if (robot.shooter.isEnabled()) {
+            setShooterTargetVelocity(shooterVelocity);
+        }
         robot.turret.setOdometryVisionEnabled(useVision);
     }
 
@@ -59,14 +58,16 @@ public class OdoTurretTest extends MainTeleOp {
         HiveTarget hive = robot.turret.getTarget();
         double dist = pose != null && hive != null
                 ? Math.hypot(hive.x - pose.x(), hive.y - pose.y()) : Double.NaN;
+        addDriverData("Shooter", robot.shooter.isEnabled() ? "On" : "Off");
         addDriverData("Shooter target / actual", String.format(Locale.US, "%.0f / %.0f",
                 robot.shooter.getTargetVelocity(), robot.shooter.getFlywheelVelocity()));
         addDriverData("Hive dist", Double.isFinite(dist)
                 ? String.format(Locale.US, "%.1f in", dist) : "--");
         addDriverData("Vision enabled", useVision);
         addDriverData("Stillness / vision status", robot.turret.getOdometryCorrectionStatus());
-        addDriverData("Chassis turret deg", String.format(Locale.US, "%.1f",
-                robot.turret.getChassisDegrees()));
+        addDriverData("Angle learning (D2 D-pad Up)", TurretAngleEstimator.applyVisionCorrections ? "On" : "Off; holding zero");
+        addDriverData("Turret deg (corrected / raw)", String.format(Locale.US, "%.1f / %.1f",
+                robot.turret.getDegrees(), robot.turret.getRawDegrees()));
         addDriverData("Vision chassis deg", String.format(Locale.US, "%.1f",
                 robot.turret.getVisionChassisDegrees()));
         addDriverData("Angle offset deg", String.format(Locale.US, "%.1f",

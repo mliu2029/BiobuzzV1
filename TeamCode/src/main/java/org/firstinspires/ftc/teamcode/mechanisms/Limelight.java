@@ -3,8 +3,11 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 import com.pedropathing.ivy.Command;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+
+import dev.nextftc.control.geometry.Pose2d;
 import dev.nextftc.hardware.webcams.NextLimelight;
 import dev.nextftc.robot.Mechanism;
+import dev.nextftc.units.measuretypes.Distance;
 
 public class Limelight implements Mechanism {
     private final NextLimelight limelight;
@@ -66,6 +69,12 @@ public class Limelight implements Mechanism {
         }
     }
 
+//    public Distance distance(){
+//        return limelight.getDistance();
+//    }
+//    public Pose2d pose(){
+//
+//    }
     public boolean isAvailable() {
         try {
             return limelight.isConnected();
