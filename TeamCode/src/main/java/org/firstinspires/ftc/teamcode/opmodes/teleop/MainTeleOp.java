@@ -98,7 +98,7 @@ public abstract class MainTeleOp extends NextOpMode {
         }
         headingDegrees = (headingDegrees % 360 + 360) % 360;
         robot.drivetrain.getFollower().setPose(new Pose(x, y, Math.toRadians(headingDegrees)));
-        robot.turret.resetOdometryAimCorrection();
+        robot.turret.resetAimTracking();
         poseResetStatus = String.format(Locale.US, "Reset to (%.1f, %.1f, %.1f deg)",
                 x, y, headingDegrees);
     }
@@ -118,7 +118,7 @@ public abstract class MainTeleOp extends NextOpMode {
 
     protected void startTurretAim() {
         Follower follower = robot.drivetrain.getFollower();
-        robot.turret.useOdometryAim(follower::pose, follower::velocity);
+        robot.turret.useOdometryAim(follower::pose);
         robot.turret.setOdometryVisionEnabled(true);
     }
 
@@ -215,13 +215,14 @@ public abstract class MainTeleOp extends NextOpMode {
         addDriverData("Alliance / aim", getAlliance() + " / " + robot.turret.getMode());
         addDriverData("Pose reset", poseResetStatus);
         addDriverData("Turret motion", robot.turret.getMotionStatus());
+        addDriverData("Turret encoder", robot.turret.getEncoderConfigurationStatus());
         addDriverData("Vision", robot.turret.getVisionStatus());
         int tag = robot.turret.getVisionTagId();
         addDriverData("Vision tag / error / age", tag < 0 ? "No usable tag"
                 : tag + " / " + oneDecimal(robot.turret.getVisionErrorDegrees()) + " deg / "
                         + oneDecimal(robot.turret.getVisionFrameAgeMs()) + " ms");
-        addDriverData("Turret deg (actual / target / error)", oneDecimal(turretDegrees)
-                + " / " + oneDecimal(turretTarget) + " / " + oneDecimal(turretTarget - turretDegrees));
+        addDriverData("Turret deg (actual / target / PID error)", oneDecimal(turretDegrees)
+                + " / " + oneDecimal(turretTarget) + " / " + oneDecimal(robot.turret.getPidErrorDegrees()));
         addDriverData("Turret cmd / encoder / recenter count", String.format(Locale.US,
                 "%.0f%% / %d ticks / %d", robot.turret.getPower() * 100,
                 robot.turret.getEncoderTicks(), robot.turret.getRecenterCount()));

@@ -187,7 +187,7 @@ public abstract class BaseModularAuto extends BaseAuto {
                 Commands.lazy(() -> aborted ? skip() : sequential(
                         Commands.waitMs(pickupDwell),
                         Commands.instant(() -> {
-                            robot.turret.useOdometryAim(follower::pose, follower::velocity);
+                            robot.turret.useOdometryAim(follower::pose);
                             robot.turret.setOdometryVisionEnabled(true);
                         })))
         );

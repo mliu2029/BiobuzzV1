@@ -2,10 +2,10 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.pedropathing.ivy.Command;
 import com.pedropathing.math.Pose;
-import com.pedropathing.math.Velocity;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes.FiducialResult;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorImplEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
@@ -14,26 +14,25 @@ import java.util.function.Supplier;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 import org.firstinspires.ftc.teamcode.util.Calculations;
 import org.firstinspires.ftc.teamcode.util.HiveTarget;
-import org.firstinspires.ftc.teamcode.util.TurretAngleEstimator;
 import org.firstinspires.ftc.teamcode.util.TurretConfig;
 
 public class Turret implements Mechanism {
     private enum Mode { OFF, MANUAL, LIMELIGHT, ODOMETRY }
     private static final double[] TAG_X_INCHES = {-6.5, -2.75, 2.75, 6.5};
 
-    private final NextMotor turret = new NextMotor("turret",
-            Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree), 0.001);
+    private DcMotorImplEx turretMotor;
+    // The named SDK motor supplies both raw REV quadrature ticks and NextMotor feedback.
+    private final NextMotor turret = new NextMotor("turret", Units.Degrees.of(0), 0.001);
     private final Limelight limelight;
-    private final TurretAngleEstimator angleEstimator = new TurretAngleEstimator();
     private Supplier<Pose> poseSupplier;
-    private Supplier<Velocity> velocitySupplier;
     private Alliance alliance;
     private HiveTarget target;
     private Mode mode = Mode.OFF;
     private boolean initialized;
     private boolean visionEnabled;
     private double startingDegrees;
-    private double zeroDegrees;
+    private int zeroTicks;
+    private double degreesPerEncoderTick = Double.NaN;
     private double manualDirection;
     private double targetDegrees = Double.NaN;
     private int recenterCount;
@@ -68,28 +67,26 @@ public class Turret implements Mechanism {
         this.alliance = alliance;
         target = alliance.close;
         this.startingDegrees = startingDegrees;
-        zeroDegrees = 0;
-        angleEstimator.reset();
+        zeroTicks = 0;
         poseSupplier = null;
-        velocitySupplier = null;
         visionEnabled = false;
         recenterCount = 0;
-        DcMotor motor = hardwareMap.get(DcMotor.class, "turret");
-        motor.setPower(0);
-        motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        turret.setAnglePerCount(Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree));
+        turretMotor = hardwareMap.get(DcMotorImplEx.class, "turret");
+        turretMotor.setPower(0);
+        // Relative encoder: the caller establishes the physical starting angle.
+        turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        updateEncoderScale();
         turret.setZeroPowerBehavior(NextMotor.ZeroPowerBehavior.BRAKE);
         initialized = true;
         limelight.initialize(hardwareMap);
-        resetOdometryAimCorrection();
+        resetAimTracking();
         stopImmediately();
     }
 
-    public void useOdometryAim(Supplier<Pose> pose, Supplier<Velocity> velocity) {
+    public void useOdometryAim(Supplier<Pose> pose) {
         poseSupplier = pose;
-        velocitySupplier = velocity;
-        resetOdometryAimCorrection();
+        resetAimTracking();
         resumeAutoAim();
     }
 
@@ -97,7 +94,7 @@ public class Turret implements Mechanism {
         boolean far = this.alliance != null && target == this.alliance.far;
         this.alliance = alliance;
         target = far ? alliance.far : alliance.close;
-        resetOdometryAimCorrection();
+        resetAimTracking();
     }
 
     public void setOdometryVisionEnabled(boolean enabled) {
@@ -106,23 +103,20 @@ public class Turret implements Mechanism {
         resetAim();
     }
 
-    /** Re-arm learning after a pose/mode change without discarding the calibrated encoder zero. */
-    public void resetOdometryAimCorrection() {
-        angleEstimator.tagLost();
+    /** Clear target tracking after a pose/mode change without changing the encoder zero. */
+    public void resetAimTracking() {
         resetAim();
     }
 
     public void resumeAutoAim() {
         if (!initialized) return;
         if (mode == Mode.MANUAL) {
-            zeroDegrees = turret.getEncoderPosition().into(Units.Degrees);
+            zeroTicks = getEncoderTicks();
             startingDegrees = 0;
             recenterCount++;
-            angleEstimator.reset();
         }
         manualDirection = 0;
         mode = poseSupplier == null ? Mode.LIMELIGHT : Mode.ODOMETRY;
-        angleEstimator.resetStillness();
         resetAim();
     }
 
@@ -160,14 +154,21 @@ public class Turret implements Mechanism {
 
     @Override
     public void periodic() {
-        if (!initialized || mode == Mode.OFF) return;
-        turret.setAnglePerCount(Units.Degrees.of(1.0 / TurretConfig.ticksPerDegree));
+        if (!initialized) return;
+        updateEncoderScale();
+        if (!TurretConfig.isEncoderConfigured()) {
+            resetAim();
+            motionStatus = "Turret disabled: configure encoder ratio and direction";
+            turret.update();
+            return;
+        }
+        if (mode == Mode.OFF) return;
         double current = getDegrees();
         if (mode == Mode.MANUAL) {
             double direction = manualDirection;
             if ((current <= TurretConfig.minDegrees && direction < 0)
                     || (current >= TurretConfig.maxDegrees && direction > 0)) direction = 0;
-            turret.setThrottle(direction * TurretConfig.manualPower * Math.signum(TurretConfig.ticksPerDegree));
+            turret.setThrottle(direction * TurretConfig.manualPower);
             motionStatus = direction == 0 ? "Manual: stopped" : "Manual bumper control";
             return;
         }
@@ -181,18 +182,11 @@ public class Turret implements Mechanism {
         targetDegrees = Double.NaN;
         Pose pose = poseSupplier == null ? null : poseSupplier.get();
         mode = poseSupplier == null ? Mode.LIMELIGHT : Mode.ODOMETRY;
-        Velocity velocity = velocitySupplier == null ? null : velocitySupplier.get();
-        if (velocity != null) {
-            angleEstimator.updateStillness(System.nanoTime(), Math.hypot(velocity.vx, velocity.vy),
-                    Math.toDegrees(velocity.omega), getVelocityDegreesPerSecond());
-        }
         if (visionEnabled || poseSupplier == null) updateVision(pose, current);
-        current = getDegrees(); // A fresh vision observation may have recalibrated the encoder zero.
         if (visionTagId < 0 && pose != null) updateOdometry(pose, current);
         if (visionTagId < 0) {
             trackedTagId = -1;
             visionDegrees = Double.NaN;
-            angleEstimator.tagLost();
         }
         if (previousTag != visionTagId) turret.getPositionPID().reset();
         if (!Double.isFinite(targetDegrees)) {
@@ -202,15 +196,23 @@ public class Turret implements Mechanism {
             return;
         }
 
-        double sign = Math.signum(TurretConfig.ticksPerDegree);
         turret.getPositionConstants()
-                .withP(sign * (mode == Mode.LIMELIGHT ? TurretConfig.visionP : TurretConfig.p))
-                .withI(sign * TurretConfig.i)
-                .withD(sign * TurretConfig.d)
-                .withS(sign * TurretConfig.staticPower * Math.min(1,
+                .withP(mode == Mode.LIMELIGHT ? TurretConfig.visionP : TurretConfig.p)
+                .withI(TurretConfig.i)
+                .withD(TurretConfig.d)
+                .withS(TurretConfig.staticPower * Math.min(1,
                         Math.abs(targetDegrees - current) / TurretConfig.staticPowerRampDegrees));
-        turret.setPositionSetpoint(Units.Degrees.of(encoderSetpointDegrees()));
+        turret.setPositionSetpoint(Units.Degrees.of(
+                targetDegrees - startingDegrees + zeroTicks * degreesPerEncoderTick));
         motionStatus = isAligned() ? "Aligned; PID holding" : "Aiming";
+    }
+
+    private void updateEncoderScale() {
+        double scale = TurretConfig.isEncoderConfigured() ? TurretConfig.getDegreesPerEncoderTick() : 0;
+        if (Double.compare(scale, degreesPerEncoderTick) == 0) return;
+        degreesPerEncoderTick = scale;
+        turret.setAnglePerCount(Units.Degrees.of(scale));
+        resetAim();
     }
 
     private void updateOdometry(Pose pose, double current) {
@@ -277,23 +279,6 @@ public class Turret implements Mechanism {
         target = bestCell;
         mode = Mode.LIMELIGHT;
         visionStatus = "2D opening: tag " + visionTagId;
-        learnEncoderAngle(pose, TurretConfig.txToCcwSign * bestError, sameFrame);
-    }
-
-    private void learnEncoderAngle(Pose pose, double cameraErrorCcwDegrees, boolean sameFrame) {
-        if (pose == null || sameFrame) return;
-        double previousOffset = angleEstimator.getOffsetDegrees();
-        if (angleEstimator.observe(System.nanoTime(), visionFrameAgeMs, bearing(pose),
-                getRawDegrees(), cameraErrorCcwDegrees)) {
-            // Rebase the held camera target too, so calibration does not move the motor by itself.
-            double shift = angleEstimator.getOffsetDegrees() - previousOffset;
-            visionDegrees = targetDegrees = reachable(targetDegrees + shift, getDegrees());
-            turret.getPositionPID().reset();
-        }
-    }
-
-    private double encoderSetpointDegrees() {
-        return angleEstimator.encoderDegrees(targetDegrees) - startingDegrees + zeroDegrees;
     }
 
     private double cameraError(HiveTarget cell, FiducialResult tag, Pose pose) {
@@ -312,22 +297,29 @@ public class Turret implements Mechanism {
         return Calculations.reachableAngle(degrees, current, TurretConfig.minDegrees, TurretConfig.maxDegrees);
     }
 
-    /** Authoritative turret angle, including the camera-calibrated encoder zero. */
+    /** Turret angle from REV quadrature counts and the explicit startup/manual zero only. */
     public double getDegrees() {
-        return angleEstimator.chassisDegrees(getRawDegrees());
-    }
-
-    public double getRawDegrees() {
-        return initialized ? startingDegrees + turret.getEncoderPosition().into(Units.Degrees) - zeroDegrees
+        return initialized && TurretConfig.isEncoderConfigured()
+                ? startingDegrees + (getEncoderTicks() - (double) zeroTicks) * TurretConfig.getDegreesPerEncoderTick()
                 : Double.NaN;
     }
 
     public double getVelocityDegreesPerSecond() {
-        return turret.getEncoderVelocity().into(Units.DegreesPerSecond);
+        return initialized && TurretConfig.isEncoderConfigured()
+                ? turretMotor.getVelocity() * TurretConfig.getDegreesPerEncoderTick() : Double.NaN;
     }
 
     public int getEncoderTicks() {
-        return (int) Math.round(turret.getEncoderPosition().into(Units.Degrees) * TurretConfig.ticksPerDegree);
+        return initialized ? turretMotor.getCurrentPosition() : 0;
+    }
+
+    public double getPidErrorDegrees() { return targetDegrees - getDegrees(); }
+
+    public String getEncoderConfigurationStatus() {
+        return TurretConfig.isEncoderConfigured()
+                ? "REV V2 / ratio " + TurretConfig.encoderRevolutionsPerTurretRevolution
+                        + " / direction " + TurretConfig.encoderDirection
+                : "INVALID ratio/direction: turret output disabled";
     }
 
     public boolean isAligned() {
@@ -354,9 +346,4 @@ public class Turret implements Mechanism {
     public int getVisionPipeline() { return visionPipeline; }
     public int getRecenterCount() { return recenterCount; }
     public double getChassisDegrees() { return getDegrees(); }
-    public double getVisionChassisDegrees() { return angleEstimator.getVisionChassisDegrees(); }
-    public double getOdometryAngleOffsetDegrees() { return angleEstimator.getOffsetDegrees(); }
-    public String getOdometryCorrectionStatus() {
-        return (visionEnabled ? "" : "Vision disabled; ") + angleEstimator.getStatus();
-    }
 }

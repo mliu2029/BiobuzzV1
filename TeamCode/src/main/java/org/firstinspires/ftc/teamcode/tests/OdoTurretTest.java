@@ -2,17 +2,13 @@ package org.firstinspires.ftc.teamcode.tests;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.follower.Follower;
-import com.pedropathing.ivy.commands.Commands;
 import com.pedropathing.math.Pose;
 import dev.nextftc.robot.opmode.NextTeleop;
-import dev.nextftc.robot.triggers.CommandGamepad;
 import java.util.Locale;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 import org.firstinspires.ftc.teamcode.util.Calculations;
 import org.firstinspires.ftc.teamcode.util.HiveTarget;
-import org.firstinspires.ftc.teamcode.util.TurretConfig;
-import org.firstinspires.ftc.teamcode.util.TurretAngleEstimator;
 import org.firstinspires.ftc.teamcode.opmodes.teleop.MainTeleOp;
 
 @Configurable
@@ -26,12 +22,6 @@ public class OdoTurretTest extends MainTeleOp {
     public OdoTurretTest(Robot robot) {
         super(robot, blueAlliance ? Alliance.BLUE : Alliance.RED);
         shooterVelocity = 0;
-    }
-
-    @Override
-    protected void configureAdditionalControls(CommandGamepad driver, CommandGamepad driver2) {
-        driver2.dpadUp().onTrue(Commands.instant(() ->
-                TurretAngleEstimator.applyVisionCorrections = !TurretAngleEstimator.applyVisionCorrections));
     }
 
     @Override
@@ -64,13 +54,6 @@ public class OdoTurretTest extends MainTeleOp {
         addDriverData("Hive dist", Double.isFinite(dist)
                 ? String.format(Locale.US, "%.1f in", dist) : "--");
         addDriverData("Vision enabled", useVision);
-        addDriverData("Stillness / vision status", robot.turret.getOdometryCorrectionStatus());
-        addDriverData("Angle learning (D2 D-pad Up)", TurretAngleEstimator.applyVisionCorrections ? "On" : "Off; holding zero");
-        addDriverData("Turret deg (corrected / raw)", String.format(Locale.US, "%.1f / %.1f",
-                robot.turret.getDegrees(), robot.turret.getRawDegrees()));
-        addDriverData("Vision chassis deg", String.format(Locale.US, "%.1f",
-                robot.turret.getVisionChassisDegrees()));
-        addDriverData("Angle offset deg", String.format(Locale.US, "%.1f",
-                robot.turret.getOdometryAngleOffsetDegrees()));
+        addDriverData("Angle source", "REV through-bore encoder; manual/startup zero");
     }
 }
