@@ -146,7 +146,6 @@ public abstract class MainTeleOp extends NextOpMode {
         robot.initialize(hardwareMap, getAlliance(), getStartingTurretDegrees());
         robot.drivetrain.getFollower().setPose(startingPose);
         robot.drivetrain.getFollower().update();
-        robot.transfer.setRollerVelocity(1925);
         poseResetStatus = "Not reset";
         robot.transfer.setFeeding(false);
         configureControls();

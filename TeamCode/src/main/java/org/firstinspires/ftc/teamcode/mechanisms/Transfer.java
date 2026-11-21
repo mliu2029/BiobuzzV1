@@ -23,7 +23,7 @@ public class Transfer implements Mechanism {
     public static volatile double kI = 0.0;
     public static volatile double kD = 0.0;
     public static volatile double kV = 0.000204;
-    public static volatile double rollerDefaultRPM = 2570;
+    public static volatile double rollerDefaultRPM = 1925;
 
     private final NextServo transfer = new NextServo("transfer");
     private final NextMotor roller = new NextMotor("rollers", Units.Rotations.of(1.0 / ticksPerRevolution));
