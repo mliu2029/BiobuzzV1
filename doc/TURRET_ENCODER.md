@@ -67,8 +67,16 @@ alignment tolerance, vision tracking, static-power taper, and measured velocity
 all remain in turret angular units. The existing non-wrapping position mode is
 retained for the limited-travel turret.
 
-P = 0.01, vision P = 0.009, I = 0, D = 0.000125, and static power = 0.04 are
-retained. They already operate on degrees, so multiplying or dividing them by
+Odometry selects the alliance's close/far hive from robot Y and computes the
+coarse target angle. When vision is enabled, a fresh tag for that selected hive
+within `TurretConfig.acquireDegrees` refines the angle using its horizontal
+error and the opening-center offset. The camera uses a deadband of
+`TurretConfig.visionUpdateDegrees`; repeated reads of one frame hold its
+setpoint. Missing, stale, wrong-pipeline, wrong-hive, or out-of-window camera
+results leave odometry in control. Without a pose, automatic aiming stops.
+
+One encoder PID handles both stages: P = 0.01, I = 0, D = 0.000125, and static
+power = 0.04. These operate on degrees, so multiplying or dividing them by
 the new encoder resolution would change the intended controller response.
 External gear feedback can change backlash, noise, and velocity measurement;
 retuning may still be needed after direction and angle scale are verified.
@@ -86,7 +94,7 @@ retuning may still be needed after direction and angle scale are verified.
    test) and autonomous telemetry show raw ticks, actual angle, target angle,
    PID error in degrees, and commanded motor power. Start with small errors;
    verify error decreases, settling, holding, and existing limit behavior.
-5. If it oscillates, reduce P/vision P and then adjust D as needed. Verify the
+5. If it oscillates, reduce P and then adjust D as needed. Verify the
    static-power taper near zero error before changing friction compensation.
 
 Offline checks cannot verify wiring, sign, physical zero, backlash, hard-stop

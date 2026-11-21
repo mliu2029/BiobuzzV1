@@ -3,8 +3,6 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
 
-import dev.nextftc.hardware.RobotController;
-import dev.nextftc.hardware.actuators.MotorVelocityConstants;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import dev.nextftc.units.Units;
@@ -29,10 +27,6 @@ public class Shooter implements Mechanism {
 
     public final Command runFlywheel = instant(() -> setVelocity(targetRPM > 0 ? targetRPM : defaultRPM));
     public final Command stopFlywheel = instant(this::stopImmediately);
-
-    // Aliases
-    public final Command run = runFlywheel;
-    public final Command stop = stopFlywheel;
 
     /** Returns a command to adjust the target flywheel velocity. */
     public Command adjustRPM(double delta) {
@@ -82,15 +76,6 @@ public class Shooter implements Mechanism {
                 .withV(kV);
     }
 
-
-    public MotorVelocityConstants getVelocityConstants() {
-        return flywheel.getVelocityConstants();
-    }
-
-    public NextMotor getFlywheel() {
-        return flywheel;
-    }
-
     public double getTargetVelocity() { return targetRPM; }
 
     public double getFlywheelVelocity() {
@@ -107,10 +92,6 @@ public class Shooter implements Mechanism {
     public boolean isReady(double tolRPM) {
         return enabled && targetRPM > 0
                 && Math.abs(getFlywheelVelocity() - targetRPM) <= tolRPM;
-    }
-
-    public String getControlStatus() {
-        return enabled ? "VELOCITY CONTROL" : "STOPPED";
     }
 
     public void stopImmediately() {

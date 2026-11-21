@@ -9,7 +9,6 @@ import dev.nextftc.robot.opmode.NextTeleop;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.mechanisms.Shooter;
 import org.firstinspires.ftc.teamcode.mechanisms.Transfer;
-import org.firstinspires.ftc.teamcode.util.LoopTiming;
 
 @Configurable
 @NextTeleop(name = "Velocity PID Tuning", group = "Tuning")
@@ -33,17 +32,11 @@ public class VelocityPidTuning extends NextOpMode {
     private boolean started;
     private boolean wasTransferOpen;
     private long lastTelemetryNanos;
-    private final LoopTiming loopTiming;
     private final TelemetryManager panelsTelemetry = PanelsTelemetry.INSTANCE.getTelemetry();
 
     public VelocityPidTuning(Robot robot) {
-        this(robot, new LoopTiming());
-    }
-
-    private VelocityPidTuning(Robot robot, LoopTiming loopTiming) {
-        super(robot, BulkReadHook.INSTANCE, loopTiming);
+        super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
-        this.loopTiming = loopTiming;
         runIntake = false;
         openTransfer = false;
         panelsTelemetry.setUpdateInterval(100);
@@ -80,7 +73,6 @@ public class VelocityPidTuning extends NextOpMode {
         long now = System.nanoTime();
         if (lastTelemetryNanos != 0 && now - lastTelemetryNanos < 100_000_000L) return;
         lastTelemetryNanos = now;
-        panelsTelemetry.addData("Loop ms (avg / p95 / max; last 256)", loopTiming.summary());
         panelsTelemetry.addData("Target Velocity (RPM)", robot.shooter.isEnabled()
                 ? robot.shooter.getTargetVelocity() : 0.0);
         panelsTelemetry.addData("Flywheel Velocity (RPM)", robot.shooter.getFlywheelVelocity());

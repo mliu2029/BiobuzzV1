@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode.util;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes.FiducialResult;
 
-/** After seeing the watched tag, require 200 ms of fresh frames without it to infer a tip. */
 public final class HiveTipDetector {
     public enum State { WAITING_FOR_TAG, VISIBLE, TAG_LOST, UNKNOWN }
     private static final long LOSS_NANOS = 200_000_000L;

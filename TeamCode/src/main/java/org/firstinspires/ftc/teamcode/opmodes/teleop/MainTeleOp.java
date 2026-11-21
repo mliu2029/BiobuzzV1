@@ -12,7 +12,6 @@ import dev.nextftc.robot.opmode.BulkReadHook;
 import dev.nextftc.robot.opmode.NextOpMode;
 import dev.nextftc.robot.triggers.CommandGamepad;
 import org.firstinspires.ftc.teamcode.util.OpModeStorage;
-import org.firstinspires.ftc.teamcode.util.LoopTiming;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 import java.util.Locale;
@@ -26,25 +25,15 @@ public abstract class MainTeleOp extends NextOpMode {
 
     protected final Robot robot;
     private final Alliance alliance;
-    private final LoopTiming loopTiming;
     private final TelemetryManager panelsTelemetry =
         PanelsTelemetry.INSTANCE.getTelemetry();
-    private double shooterPresetVelocity;
     private long lastTelemetryNanos;
     private String poseResetStatus = "Not reset";
-
-    private boolean wasIntakeStalled;
-    private boolean wasTurretAligned;
 
     protected double targetVelocity = 0.0;
 
     protected MainTeleOp(Robot robot, Alliance alliance) {
-        this(robot, alliance, new LoopTiming());
-    }
-
-    private MainTeleOp(Robot robot, Alliance alliance, LoopTiming loopTiming) {
-        super(robot, BulkReadHook.INSTANCE, loopTiming);
-        this.loopTiming = loopTiming;
+        super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
         this.alliance = alliance;
         targetVelocity = 0;
@@ -140,7 +129,6 @@ public abstract class MainTeleOp extends NextOpMode {
     protected void adjustVelocity(double change) {
         robot.shooter.adjustVelocity(change);
         targetVelocity = robot.shooter.getTargetVelocity();
-        shooterPresetVelocity = targetVelocity;
     }
 
     @Override
@@ -158,12 +146,9 @@ public abstract class MainTeleOp extends NextOpMode {
         robot.initialize(hardwareMap, getAlliance(), getStartingTurretDegrees());
         robot.drivetrain.getFollower().setPose(startingPose);
         robot.drivetrain.getFollower().update();
-        shooterPresetVelocity = robot.shooter.getTargetVelocity();
         robot.transfer.setRollerVelocity(1925);
         poseResetStatus = "Not reset";
         robot.transfer.setFeeding(false);
-        wasIntakeStalled = false;
-        wasTurretAligned = false;
         configureControls();
         startDrive();
         lastTelemetryNanos = 0;
@@ -178,27 +163,9 @@ public abstract class MainTeleOp extends NextOpMode {
         double shooterVelocity = getShooterTargetVelocity();
         if (robot.shooter.isEnabled()) {
             robot.shooter.setVelocity(shooterVelocity);
-            if (Double.isFinite(shooterVelocity) && shooterVelocity > 0) {
-                shooterPresetVelocity = shooterVelocity;
-            }
         }
 
-//        updateHaptics();
         if (telemetryDue(System.nanoTime())) updateDriverTelemetry();
-    }
-
-    private void updateHaptics() {
-        boolean stalled = robot.intake.isStalled();
-        if (stalled && !wasIntakeStalled) {
-            gamepad1.rumbleBlips(3);
-        }
-        wasIntakeStalled = stalled;
-
-        boolean aligned = robot.turret.isAligned();
-        if (aligned && !wasTurretAligned && !stalled && !gamepad1.isRumbling()) {
-            gamepad1.rumble(300);
-        }
-        wasTurretAligned = aligned;
     }
 
     protected final boolean telemetryDue(long now) {
@@ -211,7 +178,6 @@ public abstract class MainTeleOp extends NextOpMode {
     private void updateDriverTelemetry() {
         double turretDegrees = robot.turret.getDegrees();
         double turretTarget = robot.turret.getTargetDegrees();
-        addDriverData("Loop ms (avg / p95 / max; last 256)", loopTiming.summary());
         addDriverData("Alliance / aim", getAlliance() + " / " + robot.turret.getMode());
         addDriverData("Pose reset", poseResetStatus);
         addDriverData("Turret motion", robot.turret.getMotionStatus());
@@ -230,7 +196,6 @@ public abstract class MainTeleOp extends NextOpMode {
                 robot.shooter.getFlywheelVelocity(), robot.shooter.getTargetVelocity()));
         addDriverData("Intake / transfer", robot.intake.getStatus() + " / " + robot.transfer.getStatus());
         addDriverData("Ramp", robot.ramp.getStatus());
-        addDriverData("Haptics", wasIntakeStalled ? "Intake Stalled (Rumbling)" : wasTurretAligned ? "Aligned" : "Idle");
         addAdditionalDriverTelemetry();
         panelsTelemetry.update();
         telemetry.update();
@@ -247,10 +212,6 @@ public abstract class MainTeleOp extends NextOpMode {
 
     @Override
     public void end() {
-        gamepad1.stopRumble();
-        gamepad2.stopRumble();
-        wasIntakeStalled = false;
-        wasTurretAligned = false;
         targetVelocity = 0;
         robot.stopImmediately();
     }

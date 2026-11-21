@@ -6,7 +6,7 @@ import com.bylazar.configurables.annotations.Configurable;
 public final class TurretConfig {
     private TurretConfig() { }
 
-    // REV Through Bore Encoder V2 (REV-11-3174), relative A/B quadrature counts.
+
     public static final double ENCODER_COUNTS_PER_REVOLUTION = 8192.0;
     // Encoder shaft revolutions / turret revolution: 30T encoder / existing 92T turret.
     // Update this if either gear changes. Do not include the turret motor's gearbox.
@@ -17,7 +17,6 @@ public final class TurretConfig {
     public static double minDegrees = -150;
     public static double maxDegrees = 80;
     public static double p = 0.01;
-    public static double visionP = 0.009;
     public static double i = 0;
     public static double d = 0.000125;
     public static double staticPower = 0.04;

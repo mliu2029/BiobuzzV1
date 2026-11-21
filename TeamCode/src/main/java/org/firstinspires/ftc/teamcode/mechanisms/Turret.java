@@ -116,7 +116,7 @@ public class Turret implements Mechanism {
             recenterCount++;
         }
         manualDirection = 0;
-        mode = poseSupplier == null ? Mode.LIMELIGHT : Mode.ODOMETRY;
+        mode = Mode.ODOMETRY;
         resetAim();
     }
 
@@ -173,7 +173,6 @@ public class Turret implements Mechanism {
             return;
         }
 
-        int previousTag = visionTagId;
         visionTagId = -1;
         visionErrorDegrees = Double.NaN;
         visionFrameAgeMs = Double.NaN;
@@ -181,14 +180,18 @@ public class Turret implements Mechanism {
         visionStatus = "Vision disabled";
         targetDegrees = Double.NaN;
         Pose pose = poseSupplier == null ? null : poseSupplier.get();
-        mode = poseSupplier == null ? Mode.LIMELIGHT : Mode.ODOMETRY;
-        if (visionEnabled || poseSupplier == null) updateVision(pose, current);
-        if (visionTagId < 0 && pose != null) updateOdometry(pose, current);
+        mode = Mode.ODOMETRY;
+        if (pose != null) {
+            // Odometry picks the hive and coarse angle; vision only refines that same target.
+            updateOdometry(pose, current);
+            if (visionEnabled && Double.isFinite(targetDegrees)) updateVision(pose, current);
+        } else {
+            visionStatus = "Waiting for odometry pose";
+        }
         if (visionTagId < 0) {
             trackedTagId = -1;
             visionDegrees = Double.NaN;
         }
-        if (previousTag != visionTagId) turret.getPositionPID().reset();
         if (!Double.isFinite(targetDegrees)) {
             turret.setThrottle(0);
             turret.getPositionPID().reset();
@@ -197,7 +200,7 @@ public class Turret implements Mechanism {
         }
 
         turret.getPositionConstants()
-                .withP(mode == Mode.LIMELIGHT ? TurretConfig.visionP : TurretConfig.p)
+                .withP(TurretConfig.p)
                 .withI(TurretConfig.i)
                 .withD(TurretConfig.d)
                 .withS(TurretConfig.staticPower * Math.min(1,
@@ -221,6 +224,7 @@ public class Turret implements Mechanism {
         if (selected != target) {
             target = selected;
             trackedTagId = -1;
+            visionDegrees = Double.NaN;
             turret.getPositionPID().reset();
         }
         targetDegrees = reachable(bearing(pose), current);
@@ -244,15 +248,12 @@ public class Turret implements Mechanism {
                 ? result.getTimestamp() == frameTimestamp
                 : result.getControlHubTimeStamp() == frameReceiptTimestamp;
         FiducialResult best = null;
-        HiveTarget bestCell = null;
         double bestError = Double.NaN;
         double bestSetpoint = Double.NaN;
         for (FiducialResult tag : result.getFiducialResults()) {
             int id = tag.getFiducialId();
-            HiveTarget cell = alliance.close.acceptsTag(id) ? alliance.close
-                    : alliance.far.acceptsTag(id) ? alliance.far : null;
-            if (cell == null) continue;
-            double error = cameraError(cell, tag, pose);
+            if (!target.acceptsTag(id)) continue;
+            double error = cameraError(target, tag, pose);
             if (!Double.isFinite(error) || Math.abs(error) >= TurretConfig.acquireDegrees) continue;
             double requested = sameFrame && id == trackedTagId ? visionDegrees
                     : current + (Math.abs(error) > TurretConfig.visionUpdateDegrees
@@ -262,13 +263,12 @@ public class Turret implements Mechanism {
             if (best == null || id == trackedTagId
                     || (best.getFiducialId() != trackedTagId && tag.getTargetArea() > best.getTargetArea())) {
                 best = tag;
-                bestCell = cell;
                 bestError = error;
                 bestSetpoint = setpoint;
             }
         }
         if (best == null) {
-            visionStatus = "No usable alliance hive tag";
+            visionStatus = "Odometry aim; no usable tag for " + target;
             return;
         }
         trackedTagId = visionTagId = best.getFiducialId();
@@ -276,9 +276,8 @@ public class Turret implements Mechanism {
         visionDegrees = targetDegrees = bestSetpoint;
         frameTimestamp = result.getTimestamp();
         frameReceiptTimestamp = result.getControlHubTimeStamp();
-        target = bestCell;
         mode = Mode.LIMELIGHT;
-        visionStatus = "2D opening: tag " + visionTagId;
+        visionStatus = "Limelight correction: tag " + visionTagId;
     }
 
     private double cameraError(HiveTarget cell, FiducialResult tag, Pose pose) {
@@ -345,5 +344,4 @@ public class Turret implements Mechanism {
     public double getVisionFrameAgeMs() { return visionFrameAgeMs; }
     public int getVisionPipeline() { return visionPipeline; }
     public int getRecenterCount() { return recenterCount; }
-    public double getChassisDegrees() { return getDegrees(); }
 }

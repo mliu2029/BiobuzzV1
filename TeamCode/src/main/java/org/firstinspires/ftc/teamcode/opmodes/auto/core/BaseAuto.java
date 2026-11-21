@@ -12,23 +12,16 @@ import dev.nextftc.robot.opmode.NextOpMode;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.util.Alliance;
 import org.firstinspires.ftc.teamcode.util.OpModeStorage;
-import org.firstinspires.ftc.teamcode.util.LoopTiming;
 
 public abstract class BaseAuto extends NextOpMode {
     protected final Robot robot;
     private Follower follower;
     private String currentPath = "Ready";
-    private final LoopTiming loopTiming;
     private long lastTelemetryNanos;
 
     protected BaseAuto(Robot robot) {
-        this(robot, new LoopTiming());
-    }
-
-    private BaseAuto(Robot robot, LoopTiming loopTiming) {
-        super(robot, BulkReadHook.INSTANCE, loopTiming);
+        super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
-        this.loopTiming = loopTiming;
         telemetry.setMsTransmissionInterval(200);
         telemetry.addData("Status", "Ready");
         telemetry.update();
@@ -79,7 +72,6 @@ public abstract class BaseAuto extends NextOpMode {
         telemetry.addData("Path", currentPath);
         telemetry.addData("Pose (in / deg)", "%.1f / %.1f / %.1f",
                 pose.x(), pose.y(), Math.toDegrees(pose.heading()));
-        telemetry.addData("Loop ms (avg / p95 / max; last 256)", loopTiming.summary());
         telemetry.addData("Turret encoder", robot.turret.getEncoderConfigurationStatus());
         telemetry.addData("Turret ticks / power", "%d / %.3f",
                 robot.turret.getEncoderTicks(), robot.turret.getPower());

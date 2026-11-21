@@ -8,10 +8,10 @@ import dev.nextftc.robot.Mechanism;
 
 @Configurable
 public class Ramp implements Mechanism {
-    public static volatile double ramp1UpPosition = 0.2;
-    public static volatile double ramp1DownPosition = 0.95;
-    public static volatile double ramp2UpPosition = 0.8;
-    public static volatile double ramp2DownPosition = 0.05;
+    public static volatile double ramp1UpPosition = 0.7;
+    public static volatile double ramp1DownPosition = 0.03;
+    public static volatile double ramp2UpPosition = 0.3;
+    public static volatile double ramp2DownPosition = 0.97;
     private final NextServo ramp1 = new NextServo("ramp1");
     private final NextServo ramp2 = new NextServo("ramp2");
     private boolean raised = false;
@@ -39,6 +39,5 @@ public class Ramp implements Mechanism {
     }
 
     public void stopImmediately() {
-        // Clear state on stop
     }
 }
