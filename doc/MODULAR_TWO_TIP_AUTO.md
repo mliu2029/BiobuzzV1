@@ -92,41 +92,63 @@ the Java implementation. The inline simulation uses the same 29 route cases.
 5. Repeat until the selected pickups or allowed hive attempts are exhausted,
    then park through the defined route corridors.
 
+Every shooting cycle targets **4 balls**, including the preload, retries, and
+changes to the other hive. This applies to both red and blue modular autos and
+all solo/partner selections.
+
+There is no ball-count sensor. All shots use `BaseModularAuto.feedMs` (default
+1000 ms), with the shared transfer speed of 1925 RPM. This is an initial timing
+estimate, not a measured ball count; calibrate the feed window on the robot using
+a known four-ball load. All shots use the same routine, with or without vision.
+
+The modular planner explicitly selects the turret's hive before initial travel
+and after collection. Odometry computes the angle to that hive and Limelight
+corrects only tags belonging to it. TeleOp retains automatic selection by field Y.
+
 The turret is stopped during collection and parking. Aiming resumes after the
 collection dwell for the loaded return to the selected shooting pose. Collection
 completion is inferred from the timed intake step; this does not add a ball sensor.
 
-Each attempted shooting cycle consumes one attempt, including a cycle skipped
-because vision or flywheel readiness timed out. Retries require a remaining
-selected pickup. Collection and shooting may continue throughout the full
-30-second autonomous period; all mechanisms stop at 30 seconds. Parking starts
-when pickups or hive attempts are exhausted and can be interrupted by this limit.
-Arrival must be within 3 inches and 10° of each waypoint. A failed path stops the
-auto instead of advancing to another leg or shooting from the wrong location.
+Each shooting cycle waits up to 1500 ms for turret alignment and flywheel speed.
+There are no additional turret/chassis velocity checks or separate vision
+readiness requirement. Limelight refines the odometry aim when available.
+If aim or speed is still unavailable after that one wait, the robot parks with
+its current load, without collecting more balls or consuming a hive attempt.
+Only a completed feed consumes an attempt; reloads require a remaining selected
+pickup.
+
+Pedro owns path completion and arrival tolerances. The auto stops if a path
+times out or is cancelled, without applying a second set of position/heading
+checks. The existing 7.5-second cycle cutoff and shooter spin-up timing remain
+unchanged. All mechanisms stop at 30 seconds; parking can be interrupted by that
+limit.
 
 ## Tip detection
 
-The existing Limelight camera and selected Full 3D AprilTag pipeline serve both
+The existing Limelight camera and configured AprilTag pipeline serve both
 aiming and detection. The auto watches the actual tag used to aim at the intended
 hive. No additional camera or pipeline switch is used. Detection reads tag IDs
 only; it does not request a 3D pose or calculate rotation.
 
-After aim and flywheel readiness, the turret holds its encoder angle. After a
-150 ms settling period, one fresh sighting of the watched tag arms detection
-before feeding. Once armed, 200 ms without a fresh sighting gives TAG_LOST and
-counts as tipped. Seeing another tag does not reset the timer. The standalone
-tip test uses the same detector.
+During every shot, the chassis stops while turret tracking remains active.
+When the turret has a usable tag, monitoring starts before feeding and continues for
+`BaseModularAuto.tipObservationMs` (default 500 ms) after feeding stops, allowing
+the last ball time to reach the hive. The full four-ball feed window is used even
+if tag loss is detected early. Without a usable tag, the robot uses the same
+feed window, skips tip observation, and records the shot as unconfirmed.
 
-Duplicate frames cannot refresh the timer. Wrong-pipeline, stale, invalid, and
-missing results all count as no usable sighting. If the watched tag was never
-seen before feeding, the result remains UNKNOWN. Chassis translation over
-0.5 inch, heading change over 0.5°, or turret movement over 0.5° invalidates the
-trial and stops feeding. Normal odometry plus vision aiming resumes after the
-observation window.
+One fresh sighting of the watched tag arms detection. Fresh frames without that
+tag for 200 ms latch TAG_LOST and count as a likely tip. Duplicate frames cannot
+refresh the timer. A camera gap of 200 ms, wrong pipeline, or backward frame clock
+invalidates detection as UNKNOWN rather than confirming a tip. Seeing another
+tag does not count as seeing the watched tag. The standalone tip test uses the
+same detector.
 
-`RedAuto.collectionDwellMs` (default 800 ms) is configurable before START and
-captured for that run. Tag loss is the success rule: an obstruction or camera
-dropout can also trigger it, so it does not verify the hive's physical angle.
+`BaseModularAuto.collectionDwellMs` (default 800 ms) is configurable before START
+and captured for that run. Feed and observation windows are also validated and
+captured at START; dashboard changes take effect on the next run.
+Tag loss is only a likely-tip signal: an obstruction or turret motion can also
+remove the tag from view, so it does not verify the hive's physical angle.
 
 ## Code ownership
 

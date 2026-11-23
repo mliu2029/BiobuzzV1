@@ -25,12 +25,10 @@ public final class TurretConfig {
     public static double toleranceDegrees = 2;
     public static double halfwayY = 70.75;
     public static int pipeline = 0;
-    // Small horizontal camera-to-launcher alignment trim, applied after tag centering.
+    // Camera-to-launcher alignment trim, after correcting from the tag to the cell center.
     public static double visionOffsetDegrees = 0;
-
     public static double txToCcwSign = -1;
     public static double acquireDegrees = 10;
-    public static double visionUpdateDegrees = 1;
     public static double maxFrameAgeMs = 100;
 
     public static boolean isEncoderConfigured() {

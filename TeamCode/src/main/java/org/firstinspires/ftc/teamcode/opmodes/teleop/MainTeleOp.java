@@ -30,13 +30,10 @@ public abstract class MainTeleOp extends NextOpMode {
     private long lastTelemetryNanos;
     private String poseResetStatus = "Not reset";
 
-    protected double targetVelocity = 0.0;
-
     protected MainTeleOp(Robot robot, Alliance alliance) {
         super(robot, BulkReadHook.INSTANCE);
         this.robot = robot;
         this.alliance = alliance;
-        targetVelocity = 0;
         robot.prepareForInit(hardwareMap);
         panelsTelemetry.setUpdateInterval(TELEMETRY_INTERVAL_MS);
         telemetry.setMsTransmissionInterval(TELEMETRY_INTERVAL_MS);
@@ -64,7 +61,6 @@ public abstract class MainTeleOp extends NextOpMode {
 
         driver2.triangle().onTrue(robot.intake.stopIntake);
         driver2.square().onTrue(robot.turret.toggleRecenter);
-        driver2.circle().onTrue(robot.transfer.toggleServoFree);
         driver2.dpadDown().onTrue(robot.shooter.stopFlywheel);
         driver2.dpadLeft().onTrue(Commands.instant(this::resetPoseAtMark));
 
@@ -73,7 +69,6 @@ public abstract class MainTeleOp extends NextOpMode {
         driver2.rightBumper().onTrue(robot.turret.manualRight);
         driver2.rightBumper().onFalse(robot.turret.manualStop);
 
-        configureAdditionalControls(driver, driver2);
     }
 
     private void resetPoseAtMark() {
@@ -91,8 +86,6 @@ public abstract class MainTeleOp extends NextOpMode {
         poseResetStatus = String.format(Locale.US, "Reset to (%.1f, %.1f, %.1f deg)",
                 x, y, headingDegrees);
     }
-
-    protected void configureAdditionalControls(CommandGamepad driver, CommandGamepad driver2) { }
 
     protected Alliance getAlliance() { return alliance; }
 
@@ -116,20 +109,6 @@ public abstract class MainTeleOp extends NextOpMode {
     protected void updateDrive() { }
 
     protected void addAdditionalDriverTelemetry() { }
-
-    protected double getShooterTargetVelocity() {
-        return robot.shooter.isEnabled() ? robot.shooter.getTargetVelocity() : targetVelocity;
-    }
-
-    protected void setShooterTargetVelocity(double velocity) {
-        targetVelocity = velocity;
-        robot.shooter.setVelocity(velocity);
-    }
-
-    protected void adjustVelocity(double change) {
-        robot.shooter.adjustVelocity(change);
-        targetVelocity = robot.shooter.getTargetVelocity();
-    }
 
     @Override
     public void disabledPeriodic() {
@@ -158,12 +137,6 @@ public abstract class MainTeleOp extends NextOpMode {
     public void periodic() {
         updateDrive();
 
-        targetVelocity = robot.shooter.isEnabled() ? robot.shooter.getTargetVelocity() : 0.0;
-        double shooterVelocity = getShooterTargetVelocity();
-        if (robot.shooter.isEnabled()) {
-            robot.shooter.setVelocity(shooterVelocity);
-        }
-
         if (telemetryDue(System.nanoTime())) updateDriverTelemetry();
     }
 
@@ -178,21 +151,25 @@ public abstract class MainTeleOp extends NextOpMode {
         double turretDegrees = robot.turret.getDegrees();
         double turretTarget = robot.turret.getTargetDegrees();
         addDriverData("Alliance / aim", getAlliance() + " / " + robot.turret.getMode());
-        addDriverData("Pose reset", poseResetStatus);
+        panelsTelemetry.addData("Pose reset", poseResetStatus);
+        if (!"Not reset".equals(poseResetStatus)) telemetry.addData("Pose reset", poseResetStatus);
         addDriverData("Turret motion", robot.turret.getMotionStatus());
-        addDriverData("Turret encoder", robot.turret.getEncoderConfigurationStatus());
+        panelsTelemetry.addData("Turret encoder", robot.turret.getEncoderConfigurationStatus());
         addDriverData("Vision", robot.turret.getVisionStatus());
         int tag = robot.turret.getVisionTagId();
-        addDriverData("Vision tag / error / age", tag < 0 ? "No usable tag"
+        panelsTelemetry.addData("Vision tag / error / age", tag < 0 ? "No usable tag"
                 : tag + " / " + oneDecimal(robot.turret.getVisionErrorDegrees()) + " deg / "
                         + oneDecimal(robot.turret.getVisionFrameAgeMs()) + " ms");
-        addDriverData("Turret deg (actual / target / PID error)", oneDecimal(turretDegrees)
+        panelsTelemetry.addData("Turret deg (actual / target / PID error)", oneDecimal(turretDegrees)
                 + " / " + oneDecimal(turretTarget) + " / " + oneDecimal(robot.turret.getPidErrorDegrees()));
-        addDriverData("Turret cmd / encoder / recenter count", String.format(Locale.US,
+        panelsTelemetry.addData("Turret cmd / encoder / recenter count", String.format(Locale.US,
                 "%.0f%% / %d ticks / %d", robot.turret.getPower() * 100,
                 robot.turret.getEncoderTicks(), robot.turret.getRecenterCount()));
-        addDriverData("Shooter RPM (actual / target)", String.format(Locale.US, "%.0f / %.0f",
-                robot.shooter.getFlywheelVelocity(), robot.shooter.getTargetVelocity()));
+        String shooterState = !robot.shooter.isEnabled() ? "Off"
+                : robot.shooter.isReady() ? "Ready" : "Spinning up";
+        addDriverData("Shooter (state / actual / target RPM)", String.format(Locale.US, "%s / %.0f / %.0f",
+                shooterState, robot.shooter.getFlywheelVelocity(),
+                robot.shooter.isEnabled() ? robot.shooter.getTargetVelocity() : 0));
         addDriverData("Intake / transfer", robot.intake.getStatus() + " / " + robot.transfer.getStatus());
         addDriverData("Ramp", robot.ramp.getStatus());
         addAdditionalDriverTelemetry();
@@ -211,7 +188,6 @@ public abstract class MainTeleOp extends NextOpMode {
 
     @Override
     public void end() {
-        targetVelocity = 0;
         robot.stopImmediately();
     }
 }

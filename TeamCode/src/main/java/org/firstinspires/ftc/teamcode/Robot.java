@@ -2,9 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import androidx.annotation.NonNull;
 
-import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.Scheduler;
-import com.pedropathing.ivy.commands.Commands;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -85,16 +83,11 @@ public class Robot implements NextRobot {
         drivetrain.drive(gamepad).schedule();
     }
 
-    public Command stop() {
-        return Commands.instant(this::stopImmediately).requiring(getMechanisms().toArray());
-    }
-
     public void stopImmediately() {
         drivetrain.stopImmediately();
         intake.stopImmediately();
         shooter.stopImmediately();
         transfer.stopImmediately();
         turret.stopImmediately();
-        ramp.stopImmediately();
     }
 }

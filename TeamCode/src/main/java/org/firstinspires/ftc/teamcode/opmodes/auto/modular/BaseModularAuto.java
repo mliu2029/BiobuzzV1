@@ -31,6 +31,9 @@ import org.firstinspires.ftc.teamcode.util.HiveTipDetector;
 @Configurable
 public abstract class BaseModularAuto extends BaseAuto {
     public static volatile double collectionDwellMs = 800;
+    // Timed estimate for 4 balls on every shot; calibrate at 1925 roller RPM.
+    public static volatile double feedMs = 1000;
+    public static volatile double tipObservationMs = 500;
     private static final double STOP_AFTER_MS = 30_000;
     private static final double MIN_TIME_FOR_CYCLE_MS = 7_500;
 
@@ -48,8 +51,11 @@ public abstract class BaseModularAuto extends BaseAuto {
     private HiveTipDetector tipDetector;
     private boolean monitoring;
     private boolean aborted;
+    private boolean shotUnavailable;
     private int pickupIndex;
     private double pickupDwell;
+    private double feedDuration;
+    private double tipObservationDuration;
     private long startedNanos;
     private String status = "Complete Marrow Prompter before START (or defaults will be used)";
     private String lastTip = "No shot yet";
@@ -116,7 +122,7 @@ public abstract class BaseModularAuto extends BaseAuto {
             Pose start = TwoTipRoutes.startPose(startSide, alliance);
             telemetry.addData("Start pose (in / deg)", "%.2f / %.2f / %.0f",
                     start.x(), start.y(), Math.toDegrees(start.heading()));
-            telemetry.addLine("Preloaded pollen; upright hives; 2D tracking.");
+            telemetry.addLine("Feed 4 balls on every shooting cycle (timed).");
             telemetry.update();
         }
     }
@@ -127,13 +133,18 @@ public abstract class BaseModularAuto extends BaseAuto {
             status = "Warning: Prompter not confirmed; using defaults (" + status + ")";
         }
         pickupDwell = Math.max(0, Math.min(3000, Double.isFinite(collectionDwellMs) ? collectionDwellMs : 800));
+        feedDuration = Math.max(0, Math.min(3000, Double.isFinite(feedMs) ? feedMs : 1000));
+        tipObservationDuration = Math.max(0, Math.min(3000,
+                Double.isFinite(tipObservationMs) ? tipObservationMs : 500));
 
         Pose startPose = TwoTipRoutes.startPose(startSide, alliance);
         startAuto(alliance, startPose);
         follower = robot.drivetrain.getFollower();
+        shotUnavailable = false;
         startedNanos = System.nanoTime();
         sequential(
                 initAuto(),
+                Commands.instant(this::aimAtHive),
                 Commands.lazy(() -> hive == startSide ? skip() : travel(TwoTipRoutes.shooting(hive))),
                 Commands.lazy(() -> aborted ? skip() : shootAndCheck()),
                 Commands.lazy(this::nextCycle),
@@ -155,7 +166,7 @@ public abstract class BaseModularAuto extends BaseAuto {
 
     /** Every reload consumes one configured pickup. Tip/attempt decisions are made at runtime. */
     private Command nextCycle() {
-        if (aborted || pickupIndex >= pickups.size()) return skip();
+        if (aborted || shotUnavailable || pickupIndex >= pickups.size()) return skip();
         if (elapsedMs() >= STOP_AFTER_MS - MIN_TIME_FOR_CYCLE_MS) {
             status = "Time budget low; parking";
             return skip();
@@ -186,11 +197,13 @@ public abstract class BaseModularAuto extends BaseAuto {
                 travel(TwoTipRoutes.pickup(pickup)),
                 Commands.lazy(() -> aborted ? skip() : sequential(
                         Commands.waitMs(pickupDwell),
-                        Commands.instant(() -> {
-                            robot.turret.useOdometryAim(follower::pose);
-                            robot.turret.setOdometryVisionEnabled(true);
-                        })))
+                        Commands.instant(this::aimAtHive)))
         );
+    }
+
+    private void aimAtHive() {
+        robot.turret.useOdometryAim(follower::pose, getTargetHive(hive));
+        robot.turret.setOdometryVisionEnabled(true);
     }
 
     private Command travel(Stop destination) {
@@ -200,45 +213,26 @@ public abstract class BaseModularAuto extends BaseAuto {
                         .toArray(Command[]::new)));
     }
 
-    /** Accept small arrival error, but stop the routine when a leg fails or times out. */
+    /** Pedro owns arrival checks; stop the routine if a leg fails. */
     private Command travelLeg(TwoTipRoutes.Leg leg) {
         return Commands.lazy(() -> {
             if (aborted) return skip();
-            Pose currentPose = follower.pose();
-            // Generous start check - Pedro dynamically plans from currentPose to target
-            if (!at(leg.from, 8.0, 30.0)) {
-                status = "Adapting route start from " + leg.from;
-            }
             return sequential(
-                    followPath(leg.path(currentPose, alliance), leg.to.toString()),
+                    followPath(leg.path(follower.pose(), alliance), leg.to.toString()),
                     Commands.instant(() -> {
                         PathResult result = robot.drivetrain.getLastPathResult();
-                        if (result != PathResult.COMPLETED || !at(leg.to, 6.5, 20.0)) {
+                        if (result != PathResult.COMPLETED) {
                             aborted = true;
                             monitoring = false;
-                            status = "Stopped: " + leg.from + " -> " + leg.to + " ("
-                                    + (result == PathResult.COMPLETED ? "arrival outside tolerance" : result) + ")";
+                            status = "Stopped: " + leg.from + " -> " + leg.to + " (" + result + ")";
                             robot.stopImmediately();
                             return;
                         }
-                        boolean adapted = !at(leg.to, 3.5, 12.0);
                         location = leg.to;
-                        status = "Arrived at " + leg.to + (adapted ? " (adapted)" : "");
+                        status = "Arrived at " + leg.to;
                     })
             );
         });
-    }
-
-    private boolean at(Stop stop, double distanceTol, double headingTol) {
-        Pose actual = follower.pose();
-        Pose target = TwoTipRoutes.transformPose(stop.pose, alliance);
-        return isAt(actual, target, distanceTol, headingTol);
-    }
-
-    static boolean isAt(Pose actual, Pose target, double distanceTol, double headingTol) {
-        return actual != null && target != null
-                && TwoTipRoutes.distance(actual, target) <= distanceTol
-                && Math.abs(Calculations.normalize(Math.toDegrees(actual.heading() - target.heading()))) <= headingTol;
     }
 
     private Command park() {
@@ -263,85 +257,46 @@ public abstract class BaseModularAuto extends BaseAuto {
                     double speed = Double.isFinite(dist) && dist > 10 ? Calculations.velocity(dist) : Shooter.defaultRPM;
                     robot.shooter.setVelocity(speed);
                 }),
-                // Wait up to 1.5 seconds for vision alignment
                 Commands.waitUntil(this::shotReady).raceWith(Commands.waitMs(1500)),
-                Commands.conditional(this::shotReady,
-                        stationaryShot(),
-                        // Graceful fallback: attempt odometry-aligned shot if vision timed out
-                        Commands.conditional(this::odometryShotReady,
-                                fallbackOdometryShot(),
-                                Commands.instant(() -> {
-                                    plan.record(hive, false);
-                                    status = "Shot skipped: aim/speed unavailable; " + robot.turret.getVisionStatus();
-                                    lastTip = "UNKNOWN (no shot)";
-                                })))
+                Commands.conditional(this::shotReady, shoot(), Commands.instant(() -> {
+                    shotUnavailable = true;
+                    status = "Aim/speed unavailable; parking with current load";
+                    lastTip = "UNKNOWN (no shot)";
+                }))
         );
     }
 
-    /** Simplified stationary shot: smooth tracking without turret mode swap or chopped feed. */
-    private Command stationaryShot() {
+    /** Feed four balls, then observe a tip when vision supplied a watched tag. */
+    private Command shoot() {
         return sequential(
                 Commands.instant(() -> {
                     robot.drivetrain.stopImmediately();
-                    status = "Shooting " + hive;
+                    status = "Shooting " + hive + "; 4 balls (timed)";
                     int tag = robot.turret.getVisionTagId();
-                    int pipeline = robot.turret.getVisionPipeline();
-                    tipDetector = new HiveTipDetector(tag, pipeline);
-                    monitoring = true;
+                    tipDetector = tag >= 0 ? new HiveTipDetector(tag, robot.turret.getVisionPipeline()) : null;
+                    monitoring = tipDetector != null;
                     robot.transfer.setFeeding(true);
                     robot.intake.restart();
                 }),
-                Commands.waitMs(1000),
+                Commands.waitMs(feedDuration),
+                Commands.instant(() -> robot.transfer.setFeeding(false)),
+                Commands.lazy(() -> {
+                    if (!monitoring) return skip();
+                    status = "Watching for tip at " + hive;
+                    return Commands.waitMs(tipObservationDuration);
+                }),
                 Commands.instant(() -> {
-                    robot.transfer.setFeeding(false);
                     monitoring = false;
                     boolean tipped = tipDetector != null && tipDetector.tipped();
-                    lastTip = tipDetector == null ? "UNKNOWN" : tipDetector.state().toString();
+                    lastTip = tipDetector == null ? "UNCONFIRMED (no vision)" : tipDetector.state().toString();
                     plan.record(hive, tipped);
                     status = hive + ": " + lastTip;
                 })
         );
     }
 
-    /** Fallback shot using odometry when camera vision is occluded or unavailable. */
-    private Command fallbackOdometryShot() {
-        return sequential(
-                Commands.instant(() -> {
-                    status = "Shooting (odometry fallback) " + hive;
-                    robot.transfer.setFeeding(true);
-                    robot.intake.restart();
-                }),
-                Commands.waitMs(1000),
-                Commands.instant(() -> {
-                    robot.transfer.setFeeding(false);
-                    plan.record(hive, false);
-                    lastTip = "UNCONFIRMED (odometry shot)";
-                    status = hive + ": " + lastTip;
-                })
-        );
-    }
-
-    private boolean flywheelReady() {
-        return robot.shooter.isReady();
-    }
-
     private boolean shotReady() {
-        HiveTarget expected = getTargetHive(hive);
-        return flywheelReady() && robot.turret.getTarget() == expected
-                && expected.acceptsTag(robot.turret.getVisionTagId())
-                && robot.turret.isAligned() && robot.turret.isVisionAligned()
-                && Math.abs(robot.turret.getVelocityDegreesPerSecond()) <= 5
-                && follower.velocity().linSpeed() <= 1
-                && Math.abs(follower.velocity().omega) <= Math.toRadians(1);
-    }
-
-    private boolean odometryShotReady() {
-        HiveTarget expected = getTargetHive(hive);
-        return flywheelReady() && robot.turret.getTarget() == expected
-                && robot.turret.isAligned()
-                && Math.abs(robot.turret.getVelocityDegreesPerSecond()) <= 10
-                && follower.velocity().linSpeed() <= 1.5
-                && Math.abs(follower.velocity().omega) <= Math.toRadians(2);
+        return robot.turret.isAligned() && robot.shooter.isReady();
     }
 
     private double elapsedMs() { return (System.nanoTime() - startedNanos) / 1e6; }

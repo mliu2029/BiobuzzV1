@@ -36,7 +36,7 @@ public class OdoTurretTest extends MainTeleOp {
             }
         }
         if (robot.shooter.isEnabled()) {
-            setShooterTargetVelocity(shooterVelocity);
+            robot.shooter.setVelocity(shooterVelocity);
         }
         robot.turret.setOdometryVisionEnabled(useVision);
     }
@@ -48,9 +48,6 @@ public class OdoTurretTest extends MainTeleOp {
         HiveTarget hive = robot.turret.getTarget();
         double dist = pose != null && hive != null
                 ? Math.hypot(hive.x - pose.x(), hive.y - pose.y()) : Double.NaN;
-        addDriverData("Shooter", robot.shooter.isEnabled() ? "On" : "Off");
-        addDriverData("Shooter target / actual", String.format(Locale.US, "%.0f / %.0f",
-                robot.shooter.getTargetVelocity(), robot.shooter.getFlywheelVelocity()));
         addDriverData("Hive dist", Double.isFinite(dist)
                 ? String.format(Locale.US, "%.1f in", dist) : "--");
         addDriverData("Vision enabled", useVision);

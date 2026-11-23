@@ -42,17 +42,8 @@ public class Shooter implements Mechanism {
         targetRPM = defaultRPM;
         stopImmediately();
         flywheel.setDirection(NextMotor.Direction.REVERSE);
-        applyVelocityConstants();
+        setVelocityConstants(kP, kI, kD, kV);
         initialized = true;
-    }
-
-    /** Apply NextFTC velocity constants to the flywheel motor */
-    public void applyVelocityConstants() {
-        flywheel.getVelocityConstants()
-                .withP(kP)
-                .withI(kI)
-                .withD(kD)
-                .withV(kV);
     }
 
     /** Set flywheel target velocity in RPM. */
@@ -86,12 +77,8 @@ public class Shooter implements Mechanism {
     public boolean isEnabled() { return enabled; }
 
     public boolean isReady() {
-        return isReady(toleranceRPM);
-    }
-
-    public boolean isReady(double tolRPM) {
         return enabled && targetRPM > 0
-                && Math.abs(getFlywheelVelocity() - targetRPM) <= tolRPM;
+                && Math.abs(getFlywheelVelocity() - targetRPM) <= toleranceRPM;
     }
 
     public void stopImmediately() {

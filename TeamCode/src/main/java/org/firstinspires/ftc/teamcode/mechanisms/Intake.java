@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode.mechanisms;
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.ivy.Command;
 
-import dev.nextftc.hardware.RobotController;
 import dev.nextftc.hardware.actuators.NextMotor;
 import dev.nextftc.robot.Mechanism;
 import dev.nextftc.units.Units;
@@ -45,10 +44,6 @@ public class Intake implements Mechanism {
         stallConditionStartNanos = 0;
         stalled = false;
         setPower(-1);
-    }
-
-    public void stop() {
-        stopImmediately();
     }
 
     public void setPower(double power) {

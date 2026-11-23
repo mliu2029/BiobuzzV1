@@ -17,7 +17,6 @@ public class Ramp implements Mechanism {
     private boolean raised = false;
 
     public final Command up = instant(() -> setRaised(true));
-    public final Command down = instant(() -> setRaised(false));
     public final Command toggle = instant(() -> setRaised(!raised));
 
     public void setRaised(boolean raised) {
@@ -26,18 +25,11 @@ public class Ramp implements Mechanism {
         this.raised = raised;
     }
 
-    public boolean isRaised() {
-        return raised;
-    }
-
     public String getStatus() {
         return raised ? "Up" : "Down";
     }
 
     public void initialize() {
-        raised = false;
-    }
-
-    public void stopImmediately() {
+        setRaised(false);
     }
 }

@@ -1,24 +1,15 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
 import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import dev.nextftc.hardware.webcams.NextLimelight;
 import dev.nextftc.robot.Mechanism;
 
 public class Limelight implements Mechanism {
-    private final NextLimelight limelight;
+    private final NextLimelight limelight = new NextLimelight("limelight");
     private int pipeline = -1;
 
-    public Limelight() {
-        this("limelight");
-    }
-
-    public Limelight(String name) {
-        this.limelight = new NextLimelight(name);
-    }
-
-    public void initialize(HardwareMap hardwareMap) {
+    public void initialize() {
         pipeline = -1;
         try {
             limelight.setPollRate(50);
